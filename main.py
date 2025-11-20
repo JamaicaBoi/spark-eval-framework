@@ -1,0 +1,3 @@
+from graphs.workflow import method_component_factual_evaluation
+
+graph = method_component_factual_evaluation()

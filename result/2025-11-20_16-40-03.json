@@ -1,0 +1,74 @@
+{
+    "claims": [
+        {
+            "id": 1,
+            "claim": "OCR(Optical Character Recognition) refers to the automatic recognition of text content in images, and is one of the important branches of computer vision",
+            "source": "Hongtao Lu, Mukun Luo. Survey on New Progresses of Deep Learning Based Computer Vision [J]. Journal of Data Acquisition and Processing, 2022, 37(2): 247-278.",
+            "support": "no"
+        },
+        {
+            "id": 2,
+            "claim": "Traditional OCR adopts pattern recognition technology, which has many drawbacks such as too many processing links, long process, poor recognition flexibility and difficult maintenance",
+            "source": "Rihua Wang. Research on Key Technologies and Application of Intelligent OCR Recognition Based on Deep Learning [J]. Designing Techniques of Posts and Telecommunications, 2021(08): 20-24.",
+            "support": "no"
+        },
+        {
+            "id": 3,
+            "claim": "In recent years, with the rapid development of deep learning technology, the traditional OCR technology framework has been broken.",
+            "source": "",
+            "support": "no"
+        },
+        {
+            "id": 4,
+            "claim": "OCR technology based on deep learning has gradually become a research hotspot, and is widely used in many fields such as electronic bill recognition, certificate recognition, license plate recognition, natural scene text recognition and so on",
+            "source": "Rihua Wang. Research on Key Technologies and Application of Intelligent OCR Recognition Based on Deep Learning [J]. Designing Techniques of Posts and Telecommunications, 2021(08): 20-24.",
+            "support": "no"
+        },
+        {
+            "id": 5,
+            "claim": "Deep learning has strong image feature learning ability, which optimizes the traditional technical framework to a certain extent and improves the recognition effect and speed of OCR.",
+            "source": "",
+            "support": "no"
+        },
+        {
+            "id": 6,
+            "claim": "Currently, the typical OCR recognition process includes three stages: preprocessing, text detection and character recognition",
+            "source": "Tan J, Ma Y, Men K , et al. Tuberculosis in Epidemic Prevention and Control Based on Big Data Technology[J]. Journal of Physics: Conference Series, 2021, 1881(4):042036-.",
+            "support": "no"
+        },
+        {
+            "id": 7,
+            "claim": "As shown in Figure 1, the technical bottlenecks affecting the recognition accuracy lie in text detection and character recognition, which are the top priority of OCR technology research.",
+            "source": "",
+            "support": "no"
+        },
+        {
+            "id": 8,
+            "claim": "Preprocessing: usually it is to correct image imaging problems, including image noise reduction, tilt correction, blur removal, etc.",
+            "source": "",
+            "support": "no"
+        },
+        {
+            "id": 9,
+            "claim": "At present, CNN based neural network model enhancement feature extraction is widely used to solve the above problems",
+            "source": "Thi Tuyet Hai Nguyen, Adam Jatowt, Mickael Coustaty, Antoine Doucet. Survey of Post-OCR Processing Approaches [J]. ACM COMPUTING SURVEYS, 2021, 54(06): 1-11.; Xiaopei Hou, Ying Gao. Application of Convolutional Neural network CNN algorithm to text classification [J]. Science and Technology & Innovation, 2019, 0(4): 158-159.",
+            "support": "no"
+        },
+        {
+            "id": 10,
+            "claim": "Text detection: locate the text area in the image. Target recognition algorithm based on convolutional neural network is applied to text detection. Scholars constantly propose improved algorithms and adjust models, such as TextBoxes, CTPN, SEGLINK, EAST and other algorithms, to make the detection results more accurate",
+            "source": "Zhi Tian, Weilin Huang, Tong He, Pan He, Yu Qiao 0001. Detecting Text in Natural Image with Connectionist Text Proposal Network. [J]. Journal of CoRR, 2016, abs / 1609.03605.",
+            "support": "no"
+        },
+        {
+            "id": 11,
+            "claim": "Character recognition: identify the text content in the image. On the basis of traditional single character recognition, the context sequence information is introduced, and the neural network model CRNN, which depends on the temporal relationship, can be used to improve the accuracy of character recognition",
+            "source": "Shi Baoguang, Bai Xiang, Yao Cong. An End-to-End Trainable Neural Network for Image-Based Sequence Recognition and Its Application to Scene Text Recognition. [J]. IEEE transactions on pattern analysis and machine intelligence, 2017, 39(11).",
+            "support": "yes"
+        }
+    ],
+    "groundness_score": 0.6363636363636364,
+    "faithfulness_score": 0.14285714285714285,
+    "method_component": "\n1.1 Introduction to OCR technology\nOCR(Optical Character Recognition) refers to the automatic recognition of text content in images,\nand is one of the important branches of computer vision[4].Traditional OCR adopts pattern\nrecognition technology, which has many drawbacks such as too many processing links, long process,\npoor recognition flexibility and difficult maintenance[5].In recent years, with the rapid development\nof deep learning technology, the traditional OCR technology framework has been broken. OCR\ntechnology based on deep learning has gradually become a research hotspot, and is widely used in\nmany fields such as electronic bill recognition, certificate recognition, license plate recognition,\nnatural scene text recognition and so on[5]\n. Deep learning has strong image feature learning ability,\nwhich optimizes the traditional technical framework to a certain extent and improves the recognition\neffect and speed of OCR. Currently, the typical OCR recognition process includes three stages:\npreprocessing, text detection and character recognition[6]. As shown in Figure 1, the technical\nbottlenecks affecting the recognition accuracy lie in text detection and character recognition, which\nare the top priority of OCR technology research.\nFigure 1: OCR recognition process\nPreprocessing: usually it is to correct image imaging problems, including image noise reduction,\ntilt correction, blur removal, etc. At present, CNN based neural network model enhancement feature\nextraction is widely used to solve the above problems[7][8]\n.\nText detection: locate the text area in the image. Target recognition algorithm based on\nconvolutional neural network is applied to text detection. Scholars constantly propose improved\nalgorithms and adjust models, such as TextBoxes, CTPN, SEGLINK, EAST and other algorithms, to\nmake the detection results more accurate [9]\n.\nCharacter recognition: identify the text content in the image. On the basis of traditional single\ncharacter recognition, the context sequence information is introduced, and the neural network model\nCRNN, which depends on the temporal relationship, can be used to improve the accuracy of character\nrecognition[10]\n",
+    "reference": "\n[1] Cen J. Research on the judicial application of the crime of impairing the prevention and control of infectious diseases\nunder the background of novel coronavirus epidemic[C]// 2020 International Conference on Public Health and Data\nScience (ICPHDS). 2020.\n[2] Lao Chen, Jinyang Liu, Yunhui Du, et al. Design and development of the prevention and control system Model of\nCOVID in colleges and universities [J]. Chinese Journal of ICT in Education, 2021(05): 76-79.\n[3] Jian Chen, Hong-Lin Chen, Jia-ning Li. Study on the development of health codes in China in the post-epidemic era\n[C]. Proceedings of 2021 Annual Science and Technology Conference of Chinese Society for Environmental Sciences\n(III). 2021: 508-515.\n[4] Hongtao Lu, Mukun Luo. Survey on New Progresses of Deep Learning Based Computer Vision [J]. Journal of Data\nAcquisition and Processing, 2022, 37(2): 247-278.\n[5] Rihua Wang. Research on Key Technologies and Application of Intelligent OCR Recognition Based on Deep Learning\n[J]. Designing Techniques of Posts and Telecommunications, 2021(08): 20-24.\n[6] Tan J, Ma Y, Men K , et al. Tuberculosis in Epidemic Prevention and Control Based on Big Data Technology[J].\nJournal of Physics: Conference Series, 2021, 1881(4):042036-.\n[7] Thi Tuyet Hai Nguyen, Adam Jatowt, Mickael Coustaty, Antoine Doucet. Survey of Post-OCR Processing Approaches\n[J]. ACM COMPUTING SURVEYS, 2021, 54(06): 1-11.\n[8] Xiaopei Hou, Ying Gao. Application of Convolutional Neural network CNN algorithm to text classification [J].\nScience and Technology & Innovation, 2019, 0(4): 158-159.\n[9] Zhi Tian, Weilin Huang, Tong He, Pan He, Yu Qiao 0001. Detecting Text in Natural Image with Connectionist Text\nProposal Network. [J]. Journal of CoRR, 2016, abs / 1609.03605.\n[10] Shi Baoguang, Bai Xiang, Yao Cong. An End-to-End Trainable Neural Network for Image-Based Sequence\nRecognition and Its Application to Scene Text Recognition. [J]. IEEE transactions on pattern analysis and machine\nintelligence, 2017, 39(11).\n[11] Baidu open source OCR introduction [EB/OL]. [2021-12-21]. https://gitee.com/computer-vision/PaddleOCR#/\n[12] Jianmin Qiu. Improvement and Practice of Open Source PaddleOCR Technology in Enterprise Business License\nRecognition [J]. Modern Information Technology, 2021, 5(09): 65-69+74.\n[13] Xing Wang, Yongfeng Zheng, Yongbing Yan, et al. Research on Ticket Recognition Algorithm based on OCR\nTechnology [J]. Intelligent Computers and Applications, 2021, 11(11): 101-106.\n[14] Huaqiao University. A method and system for Structural output of OCR recognition Results: CN201910145824.0\n[P]. 2019-06-07.\n"
+}
