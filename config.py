@@ -5,7 +5,19 @@ EVAL_LEARNER_BG_PROMPT = "agent-spark-eval-learner_background"
 EVAL_KNOWLEDGE_DOMAIN_PROMPT = "agent-spark-eval-knowledge_domain"
 
 EVAL_WHOISTHISFOR_PROMPT = "agent-spark-eval-whoisthisfor"
+EVAL_WHOISTHISFOR_WEIGHT = {
+    "profile_concisability_result": 2,
+    "need_concisability_result": 2,
+    "format_criteria_result": 1
+}
+
 EVAL_COMPETENCY_PROMPT = "agent-spark-eval-competency"
+EVAL_COMPETENCY_WEIGHT = {
+    "concisability_result": 1,
+    "alignment_result": 1,
+    "action_verb_criteria_result": 1,
+    "format_criteria_result": 1
+}
 
 EVAL_OVERVIEW_ASSE_PROMPT = "agent-spark-eval-overview_assessment"
 EVAL_ARTIFACT_ASSE_PROMPT = "agent-spark-eval-artifact_assessment"

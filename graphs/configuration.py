@@ -1,5 +1,7 @@
 from typing import TypedDict, Literal
 
+from graphs.nodes import whoisthisfor_feedback
+
 class GraphConfig(TypedDict):
     # Prompts configuration
     prompt_provider: Literal["local", "langsmith", "langfuse"] = "langsmith"

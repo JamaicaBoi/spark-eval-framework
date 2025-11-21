@@ -24,20 +24,20 @@ class Claim(TypedDict):
     source: str
     support: str
 
+class DimensionFeedback(TypedDict):
+    artifact: str
+    feedback: dict
+    total_score: float
+
 class EvalState(TypedDict):
     claims: List[Claim]
     method_groundness_score:float
     method_faithfulness_score:float
+    dim_feedback: DimensionFeedback
 
 class MCState(TypedDict):
-    course_name: str
-    course_description: str
-    learning_outcomes: List[str]
-    knowledge_level: str
-    learner_profile: str
+    learner_background: str
+    knowledge_background: str
     micro_credentials: MicroCredential
-
     eval_score: EvalState
-    feedback: List[Dict]
-    loop_limit: int
-    current_loop: int
+
