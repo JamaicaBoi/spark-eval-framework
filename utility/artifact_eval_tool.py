@@ -8,7 +8,11 @@ from pydantic import BaseModel
 load_dotenv()
 
 import sys, datetime, json
-sys.path.append("/Users/peerawat/Documents/GitHub/spark-eval-framework/")
+from pathlib import Path
+
+# Add project root to sys.path (works on any OS)
+project_root = Path(__file__).parent.parent
+sys.path.append(str(project_root))
 
 from config import (
     CLAIMS_EXTRACTION_PROMPT,
@@ -16,9 +20,27 @@ from config import (
     EVAL_COMPETENCY_OUTPUT,
     EVAL_COMPETENCY_PROMPT,
     EVAL_COMPETENCY_WEIGHT,
+    EVAL_METHOD_COMP_OUTPUT,
+    EVAL_METHOD_COMP_PROMPT,
+    EVAL_METHOD_COMP_WEIGHT,
     EVAL_WHOISTHISFOR_PROMPT,
     EVAL_WHOISTHISFOR_OUTPUT,
-    EVAL_WHOISTHISFOR_WEIGHT
+    EVAL_WHOISTHISFOR_WEIGHT,
+    EVAL_KEY_METHOD_PROMPT,
+    EVAL_KEY_METHOD_OUTPUT,
+    EVAL_KEY_METHOD_WEIGHT,
+    EVAL_DESCRIPTION_PROMPT,
+    EVAL_DESCRIPTION_OUTPUT,
+    EVAL_DESCRIPTION_WEIGHT,
+    EVAL_OVERVIEW_ASSE_PROMPT,
+    EVAL_OVERVIEW_ASSE_OUTPUT,
+    EVAL_OVERVIEW_ASSE_WEIGHT,
+    EVAL_MAIN_ASSE_PROMPT,
+    EVAL_MAIN_ASSE_OUTPUT,
+    EVAL_MAIN_ASSE_WEIGHT,
+    EVAL_REFLECTION_ASSE_PROMPT,
+    EVAL_REFLECTION_ASSE_OUTPUT,
+    EVAL_REFLECTION_ASSE_WEIGHT
 )
 from utility.output_schema import ExtractFactualClaimsOutput,ClaimVerification
 from utility.web_search_tool import brave_search,jina_reader_fetch
@@ -97,6 +119,18 @@ async def calculate_dimension_weight(artifact_name:str,feedback:dict) -> dict:
         weight = EVAL_WHOISTHISFOR_WEIGHT
     elif artifact_name == "competency":
         weight = EVAL_COMPETENCY_WEIGHT
+    elif artifact_name == "method component":
+        weight = EVAL_METHOD_COMP_WEIGHT
+    elif artifact_name == "key method":
+        weight = EVAL_KEY_METHOD_WEIGHT
+    elif artifact_name == "description":
+        weight = EVAL_DESCRIPTION_WEIGHT
+    elif artifact_name == "overview assessment":
+        weight = EVAL_OVERVIEW_ASSE_WEIGHT
+    elif artifact_name == "main assessment":
+        weight = EVAL_MAIN_ASSE_WEIGHT
+    elif artifact_name == "reflection assessment":
+        weight = EVAL_REFLECTION_ASSE_WEIGHT
     else:
         return {}
     
@@ -131,7 +165,7 @@ async def method_component_factualness_evaluation(method_component: str, referen
     return result
 
 # @tool
-async def whoisthisfor_feedback(whoisthisfor:str) -> dict:
+async def whoisthisfor_feedback_graph(whoisthisfor:str) -> dict:
     prompt = PromptTemplate.from_template(
         template=EVAL_WHOISTHISFOR_PROMPT,
         template_format="jinja2"
@@ -144,7 +178,7 @@ async def whoisthisfor_feedback(whoisthisfor:str) -> dict:
     return result
 
 # @tool
-async def competency_feedback(whoisthisfor:str,competency:str) -> dict:
+async def competency_feedback_graph(whoisthisfor:str,competency:str) -> dict:
     prompt = PromptTemplate.from_template(
         template=EVAL_COMPETENCY_PROMPT,
         template_format="jinja2"
@@ -156,6 +190,83 @@ async def competency_feedback(whoisthisfor:str,competency:str) -> dict:
     result = await calculate_dimension_weight(artifact_name='competency',feedback=dimension_feedback)
     return result
 
+# @tool
+async def method_component_feedback_graph(whoisthisfor:str,competency:str,artifact_assessment:str,method_component:str) -> dict:
+    prompt = PromptTemplate.from_template(
+        template=EVAL_METHOD_COMP_PROMPT,
+        template_format="jinja2"
+    )
+    complie_prompt = prompt.format(whoisthisfor=whoisthisfor,competency=competency,artifact_assessment=artifact_assessment, method_component=method_component)
+    structure_llm = llm.with_structured_output(EVAL_METHOD_COMP_OUTPUT,method='json_schema')
+    dimension_feedback = await structure_llm.ainvoke(complie_prompt)
+
+    result = await calculate_dimension_weight(artifact_name='method component',feedback=dimension_feedback)
+    return result
+
+# @tool
+async def key_method_feedback_graph(method_component:str, key_method:str) -> dict:
+    prompt = PromptTemplate.from_template(
+        template=EVAL_KEY_METHOD_PROMPT,
+        template_format="jinja2"
+    )
+    complie_prompt = prompt.format(method_component=method_component, key_method=key_method)
+    structure_llm = llm.with_structured_output(EVAL_KEY_METHOD_OUTPUT,method='json_schema')
+    dimension_feedback = await structure_llm.ainvoke(complie_prompt)
+
+    result = await calculate_dimension_weight(artifact_name='key method',feedback=dimension_feedback)
+    return result
+
+# @tool
+async def mc_description_feedback_graph(competency:str, key_method:str, description:str) -> dict:
+    prompt = PromptTemplate.from_template(
+        template=EVAL_DESCRIPTION_PROMPT,
+        template_format="jinja2"
+    )
+    complie_prompt = prompt.format(competency=competency, key_method=key_method, description=description)
+    structure_llm = llm.with_structured_output(EVAL_DESCRIPTION_OUTPUT,method='json_schema')
+    dimension_feedback = await structure_llm.ainvoke(complie_prompt)
+
+    result = await calculate_dimension_weight(artifact_name='description',feedback=dimension_feedback)
+    return result
+
+# @tool
+async def overview_assessment_feedback_graph(competency:str, overview_assessment:str) -> dict:
+    prompt = PromptTemplate.from_template(
+        template=EVAL_OVERVIEW_ASSE_PROMPT,
+        template_format="jinja2"
+    )
+    complie_prompt = prompt.format(competency=competency, assessment=overview_assessment)
+    structure_llm = llm.with_structured_output(EVAL_OVERVIEW_ASSE_OUTPUT,method='json_schema')
+    dimension_feedback = await structure_llm.ainvoke(complie_prompt)
+
+    result = await calculate_dimension_weight(artifact_name='overview assessment',feedback=dimension_feedback)
+    return result
+
+# @tool
+async def main_assessment_feedback_graph(competency:str,overview_assessment:str, main_assessment:str) -> dict:
+    prompt = PromptTemplate.from_template(
+        template=EVAL_MAIN_ASSE_PROMPT,
+        template_format="jinja2"
+    )
+    complie_prompt = prompt.format(competency=competency, overview_assessment=overview_assessment, assessment=main_assessment)
+    structure_llm = llm.with_structured_output(EVAL_MAIN_ASSE_OUTPUT,method='json_schema')
+    dimension_feedback = await structure_llm.ainvoke(complie_prompt)
+
+    result = await calculate_dimension_weight(artifact_name='main assessment',feedback=dimension_feedback)
+    return result
+
+# @tool
+async def reflection_assessment_feedback_graph(competency:str,main_assessment:str, reflection_assessment:str) -> dict:
+    prompt = PromptTemplate.from_template(
+        template=EVAL_REFLECTION_ASSE_PROMPT,
+        template_format="jinja2"
+    )
+    complie_prompt = prompt.format(competency=competency, artifact_assessment=main_assessment, assessment=reflection_assessment)
+    structure_llm = llm.with_structured_output(EVAL_REFLECTION_ASSE_OUTPUT,method='json_schema')
+    dimension_feedback = await structure_llm.ainvoke(complie_prompt)
+
+    result = await calculate_dimension_weight(artifact_name='reflection assessment',feedback=dimension_feedback)
+    return result
 
 
     

@@ -515,10 +515,1274 @@ EVAL_COMPETENCY_WEIGHT = {
     "format_criteria_result": 1
 }
 
-EVAL_OVERVIEW_ASSE_PROMPT = "agent-spark-eval-overview_assessment"
-EVAL_ARTIFACT_ASSE_PROMPT = "agent-spark-eval-artifact_assessment"
-EVAL_REFLECTION_ASSE_PROMPT = "agent-spark-eval-reflection_assessment"
+EVAL_OVERVIEW_ASSE_PROMPT = """
+<instruction>
+**Your Goal**: Evaluate the <assessment> which designed to assess learner about their environment or scenario context that relevant to process to achieve the competency provided as <competency> below. You must assess quality of <assessment> and provide targeted refinement suggestions using the following dimensions.
 
-EVAL_METHOD_COMP_PROMPT = "agent-spark-eval-mrthod_component"
-EVAL_KEY_METHOD_PROMPT = "agent-spark-eval-key_method"
-EVAL_DESCRIPTION_PROMPT = "agent-spark-eval-description"
+<competency>
+{{competency}}
+</competency>
+
+---
+## DIMENSIONS
+1. **Alignment**
+evaluate whether the questions are align to the <competency> and ask for the context that relevant or useful to complete the evidence of <competency>.
+- Output **true** if the questions are related to the <competency> and provide necessary context for evidence.
+- Output **false** if the questions do not relate to the <competency> or lack necessary context for evidence.
+2. **Rubric Quality**
+evaluate whether the pass criteria generally align with the questions in the <assessment> only and can reasonably guide the classification of learner responses as pass or not pass. The rubrics can be both qualitative descriptions, quantitative indicators, or a mix of both. Focus on the <assessment> questions only
+- Output **true** if the pass criteria show reasonable alignment with the assessment question and can be used to make a basic pass/fail judgment.
+- Output **false** if the pass criteria are unclear or do not align with the questions.
+3. **Readability**
+evaluate that the questions and rubrics are clearly structured, logically organized, and written in a fluent, coherent manner that facilitates understanding and effective communication of ideas.
+- Output **true** if the questions and rubrics are clear, logical, and easy to understand.
+- Output **false** if the questions and rubrics are unclear, disorganized, or difficult to understand.
+4. **Format Criteria**
+evaluate the information that is structured as a open-ended question or list of open-ended question which assess learner response to pass or not pass. The assessment should included with response word-limit criteria
+- Output **true** if the format of the information is similar to the defined format.
+- Output **false** if the format is vague, unfocused, too long, or lacks a clear structure.
+---
+
+## YOUR TASKS
+### **Analyze the User Input**
+For each dimension:
+- Evaluate whether it meets the dimension's requirements.
+- Return only **true/false** ('<dimension's result>').
+- Provide a short explanation of your reasoning ('<dimension's explanation>').
+---
+
+## OUTPUT FORMAT
+Respond strictly in this JSON structure:
+{
+"alignment_result": <dimension's result>,
+"alignment_explanation": <dimension's explanation>,
+"rubric_quality_result": <dimension's result>,
+"rubric_quality_explanation": <dimension's explanation>,
+"readability_result": <dimension's result>,
+"readability_explanation": <dimension's explanation>,
+"format_criteria_result": <dimension's result>,
+"format_criteria_explanation": <dimension's explanation>,
+}
+---
+## EXAMPLE
+### *example 1*
+<assessment>
+"โปรดตอบคำถามต่อไปนี้
+จำกัด 500-word limit
+อธิบาย
+- บริบทในการทำงานของคุณ:
+- ทีมและบทบาทในองค์กร
+- อธิบายโครงการดิจิทัลที่ต้องการริเริ่ม
+ผ่าน: คำตอบของผู้เรียนประกอบด้วยคำอธิบายที่ชัดเจนเกี่ยวกับทีมและบทบาทในองค์กร พร้อมทั้งระบุโครงการดิจิทัลที่เฉพาะเจาะจงที่ต้องการริเริ่ม โดยแสดงให้เห็นถึงความเข้าใจในความต้องการทางธุรกิจและโอกาสในการสร้างมูลค่าผ่านเทคโนโลยีดิจิทัล
+ไม่ผ่าน: การตอบขาดความชัดเจนในการอธิบายบทบาทหรือโครงการที่ต้องการริเริ่ม หรือไม่แสดงให้เห็นถึงความเข้าใจในการเชื่อมโยงระหว่างความต้องการทางธุรกิจกับโซลูชันดิจิทัล"
+</assessment>
+
+<competency>
+"ผู้เรียนสามารถวางแผนโครงการโซลูชันดิจิทัลที่สร้างคุณค่าทางธุรกิจ โดยเชื่อมโยงวิสัยทัศน์ กลยุทธ์องค์กร และการวิเคราะห์ความเป็นไปได้ทางเศรษฐกิจและความเสี่ยง"
+</competency>
+
+<output>
+{
+"alignment_result": false,
+"alignment_explanation": "Partially aligned — The question covers basic capability information like work context and project description but lacks connection to the organization's vision, strategy, economic feasibility, and risks. Consider adding questions on the project's alignment with organizational goals, estimated economic benefits (e.g., KPI, ROI), and key risks with mitigation plans.",
+"rubric_quality_result": true,
+"rubric_quality_explanation": "The pass/fail criteria provide general direction and define list of components that should include in the learner response to be assess as 'pass'. The rubric also focus on how the learner demonstrate their understanding their context",
+"readability_result": true,
+"readability_explanation": "The questions and pass/fail criteria are clearly written and have a simple structure, making them easy to understand. The word limit helps respondents know the scope of the task, but it can be adjusted to specify the components that need to be addressed more precisely.",
+"format_criteria_result": true,
+"format_criteria_explanation": "The format consists of open-ended questions (context, team/role, and project description) with a 500-word limit, aligning with the desired format criteria."
+}
+</output>
+
+### Additional Requirements
+- All suggestions must directly solve the issue described in your analysis.
+- Suggested versions must be **concise** and **aligned with the user’s intent**.
+</instruction>
+
+**Please assess the provided <assessment> content below following the <instruction> described above**
+
+<assessment>
+{{assessment}}
+</assessment>
+"""
+EVAL_OVERVIEW_ASSE_OUTPUT = {
+  "title": "assessment_evaluation",
+  "description": "Evaluate an assessment against four dimensions (Alignment, Rubric Quality, Readability, Format Criteria). For each dimension return a boolean result and a short explanation describing the reasoning.",
+  "type": "object",
+  "properties": {
+    "alignment_result": {
+      "type": "boolean",
+      "description": "True if the assessment questions are related to the competency and provide necessary context for evidence; otherwise false."
+    },
+    "alignment_explanation": {
+      "type": "string",
+      "description": "A concise explanation of why the alignment_result was chosen, noting specific alignment strengths or gaps."
+    },
+    "rubric_quality_result": {
+      "type": "boolean",
+      "description": "True if the pass criteria align with the assessment questions and can reasonably guide pass/fail classification; otherwise false."
+    },
+    "rubric_quality_explanation": {
+      "type": "string",
+      "description": "A concise explanation of why the rubric_quality_result was chosen, highlighting clarity, relevance, or misalignment of the rubric relative to the questions."
+    },
+    "readability_result": {
+      "type": "boolean",
+      "description": "True if the questions and rubrics are clear, logical, and easy to understand; otherwise false."
+    },
+    "readability_explanation": {
+      "type": "string",
+      "description": "A concise explanation of why the readability_result was chosen, noting issues such as unclear phrasing, poor organization, or good clarity."
+    },
+    "format_criteria_result": {
+      "type": "boolean",
+      "description": "True if the assessment is structured as open-ended question(s) with a response word-limit and clear structure; otherwise false."
+    },
+    "format_criteria_explanation": {
+      "type": "string",
+      "description": "A concise explanation of why the format_criteria_result was chosen, specifying whether the format matches the required open-ended + word-limit structure and any deviations."
+    }
+  },
+  "required": [
+    "alignment_result",
+    "alignment_explanation",
+    "rubric_quality_result",
+    "rubric_quality_explanation",
+    "readability_result",
+    "readability_explanation",
+    "format_criteria_result",
+    "format_criteria_explanation"
+  ],
+  "additionalProperties": False,
+  "strict": False
+}
+EVAL_OVERVIEW_ASSE_WEIGHT = {
+    "alignment_result":1,
+    "rubric_quality_result":1,
+    "readability_result":1,
+    "format_criteria_result":1
+}
+
+EVAL_MAIN_ASSE_PROMPT = """
+<instruction>
+**Your Goal**: Evaluate the <assessment> which designed to assess learner about the understanding to the micro-credential and use to assess learner that they can achieve the <competency> or not. You must assess quality of <assessment> and provide targeted refinement suggestions using the following dimensions and based on the relevant context included with <competency> and <overview assessment>.
+
+<competency>
+{{competency}}
+</competency>
+
+<overview assessment>
+{{overview_assessment}}
+</overview assessment>
+
+---
+## DIMENSIONS
+1. **Alignment**
+evaluate whether the deliverables align with the overview assessment. Each deliverable should clearly relate to the expected responses outlined in the overview, and the report deliverable should demonstrate consistency with the main deliverable.
+- Output **true** if the deliverables are consistent with the overview assessment and clearly relate to the expected responses.
+- Output **false** if the deliverables do not align with the overview assessment or fail to relate to the expected responses.
+2. **Comprehensive**
+evaluate whether the deliverable fully meets the <competency> requirements by demonstrating a broad and accurate understanding of the topic. All key elements, such as submission information, scope, deliverable detail are present and well developed.
+- Output **true** if the deliverable meets all <competency> requirements and includes all key elements.
+- Output **false** if the deliverable does not meet the <competency> requirements or lacks key elements.
+3. **Concisability**
+evaluate whether the deliverables are clearly and concisely described, avoiding redundancy and ensuring that all essential information is included in a well-summarized form.
+- Output **true** if the deliverables are concise, clear, and free from redundancy.
+- Output **false** if the deliverables are not concise, unclear, or contain redundant information.
+4. **Learner Relevance**
+evaluates whether method to complete each deliverable match the expected knowledge level of the learner profile — neither too basic nor too advanced for the micro-credential scope.
+- Output **true** if the deliverable methods match the learner's knowledge level and are appropriate for the micro-credential scope.
+- Output **false** if the deliverable methods do not match the learner's knowledge level or are inappropriate for the micro-credential scope.
+5. **Readability**
+evaluate that the description and rubrics of each deliverable are clearly structured, logically organized, and written in a fluent, coherent manner that facilitates understanding and effective communication of ideas.
+- Output **true** if the descriptions and rubrics are clear, logical, and coherent.
+- Output **false** if the descriptions and rubrics are unclear, illogical, or incoherent.
+6. **Rubric Quality**
+evaluates whether rubric for each deliverable should present clear, observable, and measurable criteria that reflect progressive levels of mastery. Each level must distinctly communicate what constitutes full achievement (“Yes”), partial fulfillment (“Almost”), and insufficient performance (“Not Yet”), ensuring evaluators and learners share a consistent understanding of expectations.
+- Output **true** if the rubric presents clear, observable, and measurable criteria with distinct levels of mastery.
+- Output **false** if the rubric does not present clear, observable, and measurable criteria or lacks distinct levels of mastery.
+7. **Format Criteria**
+evaluate the information that is included with 2 deliverable, main deliverable artifact which can be code, exercise, experiment, etc. and report which describe more deeply about te main artifact deliverable. the assessment should provided submission instruction that tell learner how to submit, submit channel.
+- Output **true** if the format of the information is similar to the defined format.
+- Output **false** if the format is vague, unfocused, too long, or lacks a clear structure.
+---
+
+## YOUR TASKS
+### **Analyze the User Input**
+For each dimension:
+- Evaluate whether it meets the dimension's requirements.
+- Return only **true/false** ('<dimension's result>').
+- Provide a short explanation of your reasoning ('<dimension's explanation>').
+---
+
+## OUTPUT FORMAT
+Respond strictly in this JSON structure:
+{
+"alignment_result": <dimension's result>,
+"alignment_explanation": <dimension's explanation>,
+"comprehensive_result": <dimension's result>,
+"comprehensive_explanation": <dimension's explanation>,
+"concisability_result": <dimension's result>,
+"concisability_explanation": <dimension's explanation>,
+"learner_relevance_result": <dimension's result>,
+"learner_relevance_explanation": <dimension's explanation>,
+"readability_result": <dimension's result>,
+"readability_explanation": <dimension's explanation>,
+"rubric_quality_result": <dimension's result>,
+"rubric_quality_explanation": <dimension's explanation>,
+"format_criteria_result": <dimension's result>,
+"format_criteria_explanation": <dimension's explanation>,
+}
+---
+
+## EXAMPLE
+### *example 1*
+<assessment>
+"ผู้เรียนแสดง Solution Blueprint และ/หรือ Digital Solution Prototype โดยต้องจัดทำเอกสารในรูปแบบไฟล์ .docx หรือ .pdf ผ่านแพล็ตฟอร์มขององค์กร (เพื่อรักษาความลับทางการค้า) 
+ผู้เรียนส่ง To-be Swimlane Diagram (Solution Blueprint) 1 ไดอะแกรม ที่แบ่ง Lanes เป็น 3 ประเภท: Human Tasks (งานที่คนต้องทำ), Digital Solution (ระบบดิจิทัลที่จะสร้างใหม่), Legacy System (ระบบเดิมที่ยังใช้งานอยู่) แสดง:
+User Workflow: ขั้นตอนการทำงานของผู้ใช้แต่ละประเภท
+Business Rules: กฎการทำงานของระบบตาม Decision Points
+System Components: ส่วนประกอบของระบบและการเชื่อมต่อ Building Blocks
+Data Flow: การไหลของข้อมูลผ่านระบบและจุดเก็บข้อมูล
+Integration Points: จุดเชื่อมต่อกับระบบเดิม
+Technology Stack: เครื่องมือ Microsoft Power Platform ที่ใช้ในแต่ละส่วน
+กรณีที่ผู้เรียนได้นำ Blueprint ไปสร้างเป็น Digital Solution Prototype แล้วสามารถนำเสนอโซลูชันในรูปแบบ Presentation แทนได้โดยต้องจัดทำวิดีโอภายในองค์กร (เพื่อรักษาความลับทางการค้า) เป็นเวลา 3-7 นาที ในรูปแบบไฟล์ .mp4 และสไลด์ประกอบการนำเสนอ ที่อธิบาย:
+Problem Statement: อธิบายเหตุผลในการพัฒนาโซลูชันและปัญหาที่ดิจิทัลโซลูชันนี้ต้องการแก้ไข
+To-be Process: ภาพรวมของกระบวนการทำงานใหม่ แสดงการทำงานของโซลูชันดิจิทัลหรือระบบอัตโนมัติ
+User Workflow: ขั้นตอนการทำงานของผู้ใช้แต่ละประเภท
+System Description: คำอธิบายระบบที่รวมไปถึง System Components, Data Flow, Integration Points, Technology Stack, User Interface ที่ทำให้เห็นภาพชัดเจนว่าระบบทำงานอย่างไร
+
+## Scoring Rubric — To-be Swimlane Diagram
+| Artifact | “Yes” | “Almost” | “Not Yet” |
+|---------|--------|-----------|------------|
+| **To-be Swimlane Diagram** | - Swimlane Diagram แสดง User Workflow ที่สมบูรณ์ ครอบคลุมผู้ใช้แต่ละประเภท  <br>- มี Business Rules และ Decision Points ที่สะท้อนกระบวนการตัดสินใจจริง <br>- ระบุ System Components และ Building Blocks จาก Microsoft Power Platform ได้เหมาะสม <br>- แสดง Data Flow และ Integration Points กับระบบเดิมได้ชัดเจน Technology Stack สอดคล้องกับความต้องการธุรกิจ | - แสดง Swimlane Diagram แต่บางส่วนขาดรายละเอียด เช่น User Workflow ไม่ครอบคลุมผู้ใช้งานทุกกลุ่ม <br>- Business Rules หรือ Decision Points ยังไม่ชัดเจน <br>- System Components ระบุได้ แต่ยังไม่เชื่อมโยงกับ Building Blocks อย่างเฉพาะเจาะจง <br>- Data Flow หรือ Integration Points มีการระบุแต่ยังไม่สมบูรณ์ | - Swimlane Diagram ขาดรายละเอียดหรือไม่สะท้อนกระบวนการจริง <br>- ไม่มี Business Rules หรือ Decision Points ที่ชัดเจน <br>- System Components ไม่ระบุหรือไม่เหมาะสมกับความต้องการ <br>- ไม่สามารถทำความเข้าใจหรือเห็นภาพ Data Flow / Integration Points ได้ |
+| **Digital Solution Prototype Presentation** | - นำเสนอ Prototype ที่ทำงานได้จริงและสาธิตการทำงานของโซลูชันดิจิทัลหรือระบบอัตโนมัติได้ชัดเจน <br>- อธิบายปัญหาที่สะท้อนความต้องการและจำเป็นในการพัฒนาดิจิทัลโซลูชัน <br>- อธิบายกระบวนการทำงานใหม่ (To-Be Process) และ User Workflow ได้อย่างเป็นระบบ รวมถึงอธิบายส่วนประกอบและขั้นตอนการทำงานของดิจิทัลโซลูชันที่เห็นภาพได้ชัด <br>- Prototype สะท้อนการแก้ไขปัญหาทางธุรกิจได้ตรงตามความต้องการ | - สาธิตการทำงานได้แต่ยังขาดรายละเอียด เช่น การเชื่อมต่อกับ Legacy System หรือผู้ใช้งานยังไม่ครอบคลุม <br>- โซลูชันได้รับการอธิบายเป็นส่วนๆ แต่ไม่รวมเข้าเป็น To-Be Process ที่ต่อเนื่องและเป็นระบบ | - การสาธิตไม่ชัดเจนหรือไม่สะท้อนโซลูชันที่ต้องการ <br>- ไม่สามารถอธิบายการเชื่อมต่อระหว่างส่วนประกอบต่างๆ ได้ <br>- ไม่แสดงให้เห็นการแก้ไขปัญหาทางธุรกิจ |"
+</assessment>
+
+<competency>
+"ผู้เรียนสามารถแปลงกระบวนการทำงานปัจจุบันเป็นโซลูชันดิจิทัล โดยนำเสนอเป็น Solution Blueprint และ/หรือ Digital Prototype ด้วยเครื่องมือ Microsoft Power Platform"
+</competency>
+
+<overview assessment>
+"โปรดตอบคำถามต่อไปนี้
+จำกัด 500-word limit
+อธิบายบริบทในการทำงานของคุณ:
+ทีมและบทบาทในองค์กร
+อธิบายกระบวนการทำงานหรือระบบที่ต้องการออกแบบโซลูชันดิจิทัล
+ผ่าน: คำตอบของผู้เรียนประกอบด้วยคำอธิบายที่ชัดเจนเกี่ยวกับทีมและบทบาทในองค์กร พร้อมทั้งระบุกระบวนการทำงานหรือระบบเฉพาะที่ต้องการออกแบบโซลูชันดิจิทัล โดยแสดงให้เห็นถึงความเข้าใจในปัญหาการทำงานปัจจุบันและความต้องการในการปรับปรุงด้วยเทคโนโลยี
+ไม่ผ่าน: การตอบขาดความชัดเจน ขาดรายละเอียด กระบวนการที่ต้องการปรับปรุง หรือไม่แสดงให้เห็นถึงความเข้าใจบริบทการทำงาน"
+</overview assessment>
+
+<output>
+{
+    "alignment_result": true,
+    "alignment_explanation": "Deliverables directly assess the competency and require a contextual description of team, role, and process. Suggestion: include a 500-word context narrative with the artifact for alignment verification.",
+    "comprehensive_result": true,
+    "comprehensive_explanation": "Assessment covers key competency elements. Suggestion: add a checklist specifying diagram elements and granularity to remove ambiguity.",
+    "concisability_result": false,
+    "concisability_explanation": "Instructions are detailed but redundant. Suggestion: condense to a one-page checklist with single-line requirements and remove HTML tags.",
+    "learner_relevance_result": true,
+    "learner_relevance_explanation": "Tasks match the competency and expected skills. Suggestion: provide optional scaffolding for effort calibration.",
+    "readability_result": false,
+    "readability_explanation": "Descriptions are lengthy and include HTML entities, impairing comprehension. Suggestion: use bullet points, remove HTML, and separate instructions from scoring.",
+    "rubric_quality_result": true,
+    "rubric_quality_explanation": "Rubric uses observable categories and identifies artifact elements. Suggestion: add measurable criteria and example evidence for each level.",
+    "format_criteria_result": false,
+    "format_criteria_explanation": "Submission mechanics are incomplete. Suggestion: add explicit instructions for upload path, filename format, metadata, max file size, and deadline."
+}
+</output>
+
+### Additional Requirements
+- All suggestions must directly solve the issue described in your analysis.
+- Suggested versions must be **concise** and **aligned with the user’s intent**.
+</instruction>
+
+**Please assess the provided <assessment> content below following the <instruction> described above**
+
+<assessment>
+{{assessment}}
+</assessment>
+"""
+EVAL_MAIN_ASSE_OUTPUT = {
+  "title": "evaluate_assessment",
+  "description": "Schema for the evaluator output that assesses an assessment artifact against seven dimensions (Alignment, Comprehensive, Concisability, Learner Relevance, Readability, Rubric Quality, Format Criteria). Each dimension must include a boolean result and a short explanatory string.",
+  "type": "object",
+  "properties": {
+    "alignment_result": {
+      "type": "boolean",
+      "description": "Whether the deliverables align with the overview assessment and expected responses (true/false)."
+    },
+    "alignment_explanation": {
+      "type": "string",
+      "description": "Short explanation of why the deliverables do or do not align with the overview assessment."
+    },
+    "comprehensive_result": {
+      "type": "boolean",
+      "description": "Whether the deliverable fully meets the competency requirements and includes key elements (true/false)."
+    },
+    "comprehensive_explanation": {
+      "type": "string",
+      "description": "Short explanation of why the deliverable is or is not comprehensive relative to the competency."
+    },
+    "concisability_result": {
+      "type": "boolean",
+      "description": "Whether the deliverables are clear and concise, avoiding redundancy (true/false)."
+    },
+    "concisability_explanation": {
+      "type": "string",
+      "description": "Short explanation of why the deliverables are or are not concise and free from redundancy."
+    },
+    "learner_relevance_result": {
+      "type": "boolean",
+      "description": "Whether the deliverable methods match the expected knowledge level of the learner profile (true/false)."
+    },
+    "learner_relevance_explanation": {
+      "type": "string",
+      "description": "Short explanation of why the methods are or are not appropriate for the learner's level and micro-credential scope."
+    },
+    "readability_result": {
+      "type": "boolean",
+      "description": "Whether descriptions and rubrics are clearly structured, logical, and coherent (true/false)."
+    },
+    "readability_explanation": {
+      "type": "string",
+      "description": "Short explanation of why the descriptions and rubrics are or are not readable and well organized."
+    },
+    "rubric_quality_result": {
+      "type": "boolean",
+      "description": "Whether the rubric presents clear, observable, and measurable criteria with distinct mastery levels (true/false)."
+    },
+    "rubric_quality_explanation": {
+      "type": "string",
+      "description": "Short explanation of why the rubric does or does not meet quality criteria for observable and measurable levels."
+    },
+    "format_criteria_result": {
+      "type": "boolean",
+      "description": "Whether the assessment provides clear format and submission instructions for main and report deliverables (true/false)."
+    },
+    "format_criteria_explanation": {
+      "type": "string",
+      "description": "Short explanation of why the format and submission instructions are or are not adequate and clear."
+    }
+  },
+  "required": [
+    "alignment_result",
+    "alignment_explanation",
+    "comprehensive_result",
+    "comprehensive_explanation",
+    "concisability_result",
+    "concisability_explanation",
+    "learner_relevance_result",
+    "learner_relevance_explanation",
+    "readability_result",
+    "readability_explanation",
+    "rubric_quality_result",
+    "rubric_quality_explanation",
+    "format_criteria_result",
+    "format_criteria_explanation"
+  ],
+  "additionalProperties": False,
+  "strict": False
+}
+EVAL_MAIN_ASSE_WEIGHT = {
+    "alignment_result":1,
+    "comprehensive_result":1,
+    "concisability_result":1,
+    "learner_relevance_result":1,
+    "readability_result":1,
+    "rubric_quality_result":1,
+    "format_criteria_result":1
+}
+
+EVAL_REFLECTION_ASSE_PROMPT = """
+<instruction>
+**Your Goal**: Evaluate the <assessment>, which is a sub-assessment designed to assess learner reflection. This reflection may include thoughts about the challenges faced while implementing the assessment after completing their <artifact assessment>, or insights gained after finishing the course. You must assess the quality of the <assessment> and provide targeted refinement suggestions using the following dimensions with provided <competency> and <artifact assessment> as context.
+ 
+<artifact assessment>
+{{artifact_assessment}}
+</artifact assessment>
+
+<competency>
+{{competency}}
+</competency>
+
+---
+## DIMENSIONS
+1. **Question Quality**
+evaluate that the questions in <assessment> are aligned and designed to reflect the learner's understanding after completing the assessment. The questions should inquire about how the assessment impacts their scenario or real-world environment or what challenges were faced during the learning process.
+- Output **true** if the assessment questions clearly relate to the learner's real-world scenario or address challenges faced during learning.
+- Output **false** if the assessment questions do not clearly relate to the learner's real-world scenario or fail to address challenges faced during learning.
+2. **Rubric Quality**
+evaluate that the pass criteria should describe clear, observable, and measurable criteria that reflect the learner experience or insight after complete the deliverable. The rubrics can be both qualitative descriptions, quantitative indicators, or a mix of both. Focus on the <assessment> questions only
+- Output **true** if the rubrics provide clear, observable, and measurable criteria that accurately reflect the learner's experience or insights after completing the deliverable.
+- Output **false** if the rubrics do not provide clear, observable, and measurable criteria that accurately reflect the learner's experience or insights after completing the deliverable.
+3. **Readability**
+evaluate that the questions and rubrics are clearly structured, logically organized, and written in a fluent, coherent manner that facilitates understanding and effective communication of ideas.
+- Output **true** if the questions and rubrics are clear, logical, and easy to understand.
+- Output **false** if the questions and rubrics are unclear, disorganized, or difficult to understand.
+4. **Format Criteria**
+evaluate the information that is structured as a open-ended question or list of open-ended question which assess learner response to pass or not pass. The assessment should included with response word-limit criteria
+- Output **true** if the format of the information is similar to the defined format.
+- Output **false** if the format is vague, unfocused, too long, or lacks a clear structure.
+---
+
+## YOUR TASKS
+### **Analyze the User Input**
+For each dimension:
+- Evaluate whether it meets the dimension's requirements.
+- Return only **true/false** ('<dimension's result>').
+- Provide a short explanation of your reasoning ('<dimension's explanation>').
+---
+
+## OUTPUT FORMAT
+Respond strictly in this JSON structure:
+{
+"question_quality_result": <dimension's result>,
+"question_quality_explanation": <dimension's explanation>,
+"rubric_quality_result": <dimension's result>,
+"rubric_quality_explanation": <dimension's explanation>,
+"readability_result": <dimension's result>,
+"readability_explanation": <dimension's explanation>,
+"format_criteria_result": <dimension's result>,
+"format_criteria_explanation": <dimension's explanation>,
+}
+---
+
+## EXAMPLE
+### *example 1*
+<assessment>
+"โปรดตอบคำถามต่อไปนี้ 
+จำกัด 300-word limit
+คุณเจอความยากหรือความท้าทายอะไรบ้าง ในระหว่างที่แปลงกระบวนการทำงานเป็นดิจิทัลโซลูชัน และจัดการกับความยากหรือท้าทายนั้นอย่างไร?
+คุณได้เรียนรู้อะไรจาก Digital Solution Designer ที่คิดว่าจะนำไปใช้ต่อยอดในงานหรือโปรเจ็คต่อไป?
+ผ่าน: คำตอบของผู้เรียนอธิบายอย่างน้อย 1 ตัวอย่างของความท้าทายหรือความยากในการแปลงกระบวนการทำงานเป็นดิจิทัลโซลูชัน และยังแสดงการสะท้อนคิดเชื่อมโยงการเรียนรู้กับการปฏิบัติงานจริง มีแผนการนำไปใช้ที่ชัดเจน
+ไม่ผ่าน: การสะท้อนคิดผิวเผิน หรือไม่เกี่ยวข้องกับการทำงานจริง"
+</assessment>
+
+<artifact assessment>
+
+</artifact assessment>
+"ผู้เรียนแสดง Solution Blueprint และ/หรือ Digital Solution Prototype โดยต้องจัดทำเอกสารในรูปแบบไฟล์ .docx หรือ .pdf ผ่านแพล็ตฟอร์มขององค์กร (เพื่อรักษาความลับทางการค้า) 
+ผู้เรียนส่ง To-be Swimlane Diagram (Solution Blueprint) 1 ไดอะแกรม ที่แบ่ง Lanes เป็น 3 ประเภท: Human Tasks (งานที่คนต้องทำ), Digital Solution (ระบบดิจิทัลที่จะสร้างใหม่), Legacy System (ระบบเดิมที่ยังใช้งานอยู่) แสดง:
+User Workflow: ขั้นตอนการทำงานของผู้ใช้แต่ละประเภท
+Business Rules: กฎการทำงานของระบบตาม Decision Points
+System Components: ส่วนประกอบของระบบและการเชื่อมต่อ Building Blocks
+Data Flow: การไหลของข้อมูลผ่านระบบและจุดเก็บข้อมูล
+Integration Points: จุดเชื่อมต่อกับระบบเดิม
+Technology Stack: เครื่องมือ Microsoft Power Platform ที่ใช้ในแต่ละส่วน
+กรณีที่ผู้เรียนได้นำ Blueprint ไปสร้างเป็น Digital Solution Prototype แล้วสามารถนำเสนอโซลูชันในรูปแบบ Presentation แทนได้โดยต้องจัดทำวิดีโอภายในองค์กร (เพื่อรักษาความลับทางการค้า) เป็นเวลา 3-7 นาที ในรูปแบบไฟล์ .mp4 และสไลด์ประกอบการนำเสนอ ที่อธิบาย:
+Problem Statement: อธิบายเหตุผลในการพัฒนาโซลูชันและปัญหาที่ดิจิทัลโซลูชันนี้ต้องการแก้ไข
+To-be Process: ภาพรวมของกระบวนการทำงานใหม่ แสดงการทำงานของโซลูชันดิจิทัลหรือระบบอัตโนมัติ
+User Workflow: ขั้นตอนการทำงานของผู้ใช้แต่ละประเภท
+System Description: คำอธิบายระบบที่รวมไปถึง System Components, Data Flow, Integration Points, Technology Stack, User Interface ที่ทำให้เห็นภาพชัดเจนว่าระบบทำงานอย่างไร
+
+## Scoring Rubric — To-be Swimlane Diagram
+| Artifact | “Yes” | “Almost” | “Not Yet” |
+|---------|--------|-----------|------------|
+| **To-be Swimlane Diagram** | - Swimlane Diagram แสดง User Workflow ที่สมบูรณ์ ครอบคลุมผู้ใช้แต่ละประเภท  <br>- มี Business Rules และ Decision Points ที่สะท้อนกระบวนการตัดสินใจจริง <br>- ระบุ System Components และ Building Blocks จาก Microsoft Power Platform ได้เหมาะสม <br>- แสดง Data Flow และ Integration Points กับระบบเดิมได้ชัดเจน Technology Stack สอดคล้องกับความต้องการธุรกิจ | - แสดง Swimlane Diagram แต่บางส่วนขาดรายละเอียด เช่น User Workflow ไม่ครอบคลุมผู้ใช้งานทุกกลุ่ม <br>- Business Rules หรือ Decision Points ยังไม่ชัดเจน <br>- System Components ระบุได้ แต่ยังไม่เชื่อมโยงกับ Building Blocks อย่างเฉพาะเจาะจง <br>- Data Flow หรือ Integration Points มีการระบุแต่ยังไม่สมบูรณ์ | - Swimlane Diagram ขาดรายละเอียดหรือไม่สะท้อนกระบวนการจริง <br>- ไม่มี Business Rules หรือ Decision Points ที่ชัดเจน <br>- System Components ไม่ระบุหรือไม่เหมาะสมกับความต้องการ <br>- ไม่สามารถทำความเข้าใจหรือเห็นภาพ Data Flow / Integration Points ได้ |
+| **Digital Solution Prototype Presentation** | - นำเสนอ Prototype ที่ทำงานได้จริงและสาธิตการทำงานของโซลูชันดิจิทัลหรือระบบอัตโนมัติได้ชัดเจน <br>- อธิบายปัญหาที่สะท้อนความต้องการและจำเป็นในการพัฒนาดิจิทัลโซลูชัน <br>- อธิบายกระบวนการทำงานใหม่ (To-Be Process) และ User Workflow ได้อย่างเป็นระบบ รวมถึงอธิบายส่วนประกอบและขั้นตอนการทำงานของดิจิทัลโซลูชันที่เห็นภาพได้ชัด <br>- Prototype สะท้อนการแก้ไขปัญหาทางธุรกิจได้ตรงตามความต้องการ | - สาธิตการทำงานได้แต่ยังขาดรายละเอียด เช่น การเชื่อมต่อกับ Legacy System หรือผู้ใช้งานยังไม่ครอบคลุม <br>- โซลูชันได้รับการอธิบายเป็นส่วนๆ แต่ไม่รวมเข้าเป็น To-Be Process ที่ต่อเนื่องและเป็นระบบ | - การสาธิตไม่ชัดเจนหรือไม่สะท้อนโซลูชันที่ต้องการ <br>- ไม่สามารถอธิบายการเชื่อมต่อระหว่างส่วนประกอบต่างๆ ได้ <br>- ไม่แสดงให้เห็นการแก้ไขปัญหาทางธุรกิจ |"
+
+<competency>
+"ผู้เรียนสามารถแปลงกระบวนการทำงานปัจจุบันเป็นโซลูชันดิจิทัล โดยนำเสนอเป็น Solution Blueprint และ/หรือ Digital Prototype ด้วยเครื่องมือ Microsoft Power Platform"
+</competency>
+
+<output>
+{
+"question_quality_result": true,
+"question_quality_explanation": "คำถามเป็นแบบสะท้อนความคิดที่ตรงไปยังประสบการณ์จริงของผู้เรียน (ความยาก/การจัดการ) และขอให้ระบุบทเรียนที่จะนำไปใช้ต่อ จึงเชื่อมโยงกับสถานการณ์การทำงานจริงได้ชัดเจน",
+"rubric_quality_result": true,
+"rubric_quality_explanation": "เกณฑ์ผ่านกำหนดเงื่อนไขที่สังเกตได้ชัดเจน (อย่างน้อย 1 ตัวอย่างความท้าทาย + การเชื่อมโยงการเรียนรู้กับการปฏิบัติงานจริง + แผนการนำไปใช้) ทำให้การประเมินเป็นไปได้แม้จะเป็นเชิงคุณภาพ",
+"readability_result": true,
+"readability_explanation": "คำถามและเกณฑ์ผ่าน/ไม่ผ่านเขียนอย่างกระชับและชัดเจน โครงสร้างตรรกะเรียงลำดับดี อ่านเข้าใจง่าย",
+"format_criteria_result": true,
+"format_criteria_explanation": "เป็นชุดคำถามปลายเปิดตามที่ระบุ และมีการกำหนดขอบเขตคำตอบ (300-word limit) จึงสอดคล้องกับรูปแบบข้อกำหนด"
+}
+</output>
+
+### Additional Requirements
+- All suggestions must directly solve the issue described in your analysis.
+- Suggested versions must be **concise** and **aligned with the user’s intent**.
+</instruction>
+
+**Please assess the provided <assessment> content below following the <instruction> described above**
+
+<assessment>
+{{assessment}}
+</assessment>
+"""
+EVAL_REFLECTION_ASSE_OUTPUT = {
+  "title": "evaluate_reflection_assessment",
+  "description": "Assess the quality of a learner reflection assessment using four dimensions (Question Quality, Rubric Quality, Readability, Format Criteria). For each dimension return a boolean result and a short explanation of the reasoning.",
+  "type": "object",
+  "properties": {
+    "question_quality_result": {
+      "type": "boolean",
+      "description": "True if the assessment questions clearly relate to the learner's real-world scenario or address challenges faced during learning; otherwise false."
+    },
+    "question_quality_explanation": {
+      "type": "string",
+      "description": "A concise explanation (short sentence) justifying the question_quality_result."
+    },
+    "rubric_quality_result": {
+      "type": "boolean",
+      "description": "True if the rubric provides clear, observable, and measurable criteria reflecting the learner's experience/insights; otherwise false."
+    },
+    "rubric_quality_explanation": {
+      "type": "string",
+      "description": "A concise explanation (short sentence) justifying the rubric_quality_result."
+    },
+    "readability_result": {
+      "type": "boolean",
+      "description": "True if questions and rubrics are clearly structured, logical, and easy to understand; otherwise false."
+    },
+    "readability_explanation": {
+      "type": "string",
+      "description": "A concise explanation (short sentence) justifying the readability_result."
+    },
+    "format_criteria_result": {
+      "type": "boolean",
+      "description": "True if the assessment is formatted as open-ended question(s) with response word-limit criteria as specified; otherwise false."
+    },
+    "format_criteria_explanation": {
+      "type": "string",
+      "description": "A concise explanation (short sentence) justifying the format_criteria_result."
+    }
+  },
+  "required": [
+    "question_quality_result",
+    "question_quality_explanation",
+    "rubric_quality_result",
+    "rubric_quality_explanation",
+    "readability_result",
+    "readability_explanation",
+    "format_criteria_result",
+    "format_criteria_explanation"
+  ],
+  "additionalProperties": False,
+  "strict": False
+}
+EVAL_REFLECTION_ASSE_WEIGHT = {
+    "question_quality_result":1,
+    "rubric_quality_result":1,
+    "readability_result":1,
+    "format_criteria_result":1
+}
+
+EVAL_METHOD_COMP_PROMPT = """
+<instruction>
+**Your Goal**: Evaluate the <method component> that describe the overview content to be taught in the micro-credential. The content is an overview aimed at teaching the learner, as described in <who is this for>, to achieve the <competency>, as indicated by the designed <artifact assessment>. You must assess the quality of <method components> and provide targeted refinement suggestions using the following dimensions and the provided context, which includes <who is this for>, <competency>, and <artifact assessment>
+
+<who is this for>
+{{whoisthisfor}}
+</who is this for>
+
+<competency>
+{{competency}}
+</competency>
+
+<artifact assessment>
+{{artifact_assessment}}
+</artifact assessment>
+
+---
+## DIMENSIONS
+1. **Alignment**
+evaluates whether the content or topic directly support the targeted <competency> or skill outcomes. The learning experiences should explicitly enable learners to demonstrate the intended performance or behavior. 
+- Output **true** if the content directly supports the targeted competency and enables learners to demonstrate the intended performance.
+- Output **false** if the content does not support the targeted competency or fails to enable the intended performance.
+2. **Coverage**
+evaluate whether the method components cover all necessary topic to achieve the <artifact assessment>. No missing key elements
+- Output **true** if all necessary topics are covered and no key elements are missing.
+- Output **false** if any necessary topics are missing or key elements are not covered.
+3. **Learner Relevance**
+evaluates whether method content match the expected prior knowledge level of the learner. Methods should neither oversimplify nor exceed the intended level of the micro-credential.
+- Output **true** if the content matches the expected prior knowledge level and is appropriately challenging.
+- Output **false** if the content is either too simplistic or too advanced for the expected learner level.
+4. **Consistency**
+evaluates whether the method components are logically connected and structured progressively to support learners in understanding each step toward achieving the <artifact assessment> and <competency>. No redundancy and overlap content in each component
+- Output **true** if the components are logically connected, structured progressively, and free of redundancy.
+- Output **false** if the components are disjointed, lack progression, or contain redundant content.
+5. **Readability**
+evaluate that the description and rubrics of each deliverable are clearly structured, logically organized, and written in a fluent, coherent manner that facilitates understanding and effective communication of ideas.
+- Output **true** if the descriptions and rubrics are clear, logical, and coherent.
+- Output **false** if the descriptions and rubrics are unclear, illogical, or incoherent.
+6. **Format Criteria**
+evaluate the information are included with the introduction paragraph ,which relate to the <competency> and <who is this for> and structured in topic, sub-topic / bullet-point come with a short description or summary about the topic
+- Output **true** if the format of the information is similar to the defined format.
+- Output **false** if the format is vague, unfocused, too long, or lacks a clear structure.
+---
+
+## YOUR TASKS
+### **Analyze the User Input**
+For each dimension:
+- Evaluate whether it meets the dimension's requirements.
+- Return only **true/false** ('<dimension's result>').
+- Provide a short explanation of your reasoning ('<dimension's explanation>').
+---
+
+## OUTPUT FORMAT
+Respond strictly in this JSON structure:
+{
+"alignment_result": <dimension's result>,
+"alignment_explanation": <dimension's explanation>,
+"coverage_result": <dimension's result>,
+"coverage_explanation": <dimension's explanation>,
+"learner_relevance_result": <dimension's result>,
+"learner_relevance_explanation": <dimension's explanation>,
+"consistency_result": <dimension's result>,
+"consistency_explanation": <dimension's explanation>,
+"readability_result": <dimension's result>,
+"readability_explanation": <dimension's explanation>,
+"format_criteria_result": <dimension's result>,
+"format_criteria_explanation": <dimension's explanation>
+}
+---
+
+## EXAMPLE
+### *example 1*
+<method component>
+"การออกแบบโซลูชันดิจิทัลที่ถูกต้องและรวดเร็วต้องอาศัยกระบวนการที่เป็นระบบและเครื่องมือที่ช่วยจัดระเบียบความคิด รวมถึงต้องมีความรู้ความเข้าใจเกี่ยวกับองค์ประกอบของดิจิทัลโซลูชันและความสามารถของเครื่องมือที่จะใช้พัฒนาโซลูชัน 
+ผู้เรียนจะฝึกใช้ Business Process Modeling, Gap Analysis และ Digital Building Blocks เพื่อแปลงความต้องการทางธุรกิจเป็นโซลูชันดิจิทัลที่ใช้งานได้จริง โดยเนื้อหาทักษะจะครอบคลุม 4 องค์ประกอบสำคัญดังนี้:
+1. Business Process Modeling และ Gap Analysis คือ การวิเคราะห์กระบวนการทำงานอย่างเป็นระบบเพื่อระบุโอกาสในการปรับปรุงด้วยเทคโนโลยีดิจิทัล โดยใช้เครื่องมือ Swimlane Diagram เพื่อให้เห็นภาพชัดเจนของ Workflow และจุดที่ต้องปรับปรุง
+1.1. As-is Process Mapping: วิเคราะห์กระบวนการปัจจุบันโดยใช้ Swimlane Diagram เพื่อทำความเข้าใจการทำงานที่เกิดขึ้นจริง (รูปที่ 1)
+กำหนด Scope และผู้เกี่ยวข้อง (Players/Lanes): ระบุขอบเขตของกระบวนการ จุดเริ่มต้น-สิ้นสุด และแผนก/บุคคลที่เกี่ยวข้อง
+ระบุกิจกรรมหลัก (Key Activities) และลำดับการทำงาน: ลิสต์งานทั้งหมดในกระบวนการและเรียงลำดับตามลำดับเวลา
+เชื่อมโยงการไหลของงาน (Flow) และจุดส่งต่อ (Handoffs): วาดเส้นเชื่อมและให้ความสำคัญกับจุดที่งานข้ามระหว่างแผนก
+ตรวจสอบความถูกต้อง: นำ Diagram ไปให้เจ้าของกระบวนการตรวจสอบและ Role-Play เพื่อหาข้อผิดพลาด
+1.2 Process Improvement Discovery: การค้นหาและวิเคราะห์โอกาสในการปรับปรุงกระบวนการทำงาน เป็นขั้นตอนสำคัญหลังจากที่ผู้เรียนได้ทำการวิเคราะห์กระบวนการปัจจุบัน (As-is) แล้ว เพื่อหาจุดที่เป็นปัญหา (Pain Points) และโอกาสพัฒนา (Opportunities) อย่างเป็นระบบ โดยพิจารณาใน 3 มิติหลัก (รูปที่ 2) ดังนี้
+People (บุคลากร)	
+Skills (ทักษะ): ตรวจสอบว่าบุคลากรมีทักษะเพียงพอต่อการปฏิบัติงานหรือไม่ เช่น ขาดความรู้ด้านการใช้เครื่องมือดิจิทัล, ต้องใช้เวลามากในการฝึกอบรม
+Bottleneck (จุดคอขวด): หาช่วงที่งานติดขัดเพราะต้องรอการอนุมัติ, รอคนเพียงบางตำแหน่ง หรือใช้เวลามากเกินความจำเป็น
+Handoffs (การส่งต่องาน): วิเคราะห์ว่าการส่งต่อข้อมูลหรือเอกสารระหว่างบุคคลหรือหน่วยงานทำให้เกิดความล่าช้าหรือข้อมูลสูญหายหรือไม่
+Process (กระบวนการ)
+Redundancy (ความซ้ำซ้อน): มีขั้นตอนที่ทำซ้ำโดยไม่จำเป็นหรือไม่ เช่น การบันทึกข้อมูลซ้ำในหลายระบบ
+Delays (ความล่าช้า): ขั้นตอนใดใช้เวลานานกว่ามาตรฐาน หรือเกิดการรอคอยที่ไม่สร้างคุณค่า
+Complexity (ความซับซ้อน): มีขั้นตอนที่ซับซ้อนเกินความจำเป็น ทำให้บุคลากรสับสนหรือเกิดข้อผิดพลาดง่าย
+3. Technology (เทคโนโลยี)
+Manual Work (งานที่ทำด้วยมือ): งานที่สามารถทำให้อัตโนมัติได้ แต่ยังคงทำด้วยคน เช่น การกรอกข้อมูลซ้ำ หรือการรวมไฟล์ด้วยตนเอง
+Tools (เครื่องมือ): เครื่องมือปัจจุบันไม่เพียงพอหรือไม่มีการบูรณาการระหว่างระบบ ทำให้เกิดช่องว่างในการทำงาน
+Data (ข้อมูล): ข้อมูลไม่ครบถ้วน, ไม่มีมาตรฐาน หรือไม่สามารถเข้าถึงได้ง่าย ทำให้การตัดสินใจล่าช้าหรือผิดพลาด
+
+รูปที่ 1 ตัวอย่าง As-is Swimlane Diagram จากกระบวนการ Business Process Modeling
+
+รูปที่ 2 Process Improvement Discovery Framework
+2. Digital Solution Architecture และ Building Blocks คือ การออกแบบโครงสร้างของโซลูชันดิจิทัลโดยมองภาพรวมว่ามีองค์ประกอบ (Building Blocks) อะไรบ้างและแต่ละส่วนทำงานร่วมกันอย่างไร เพื่อให้ได้โซลูชันที่ตอบโจทย์ปัญหาและความต้องการของธุรกิจ ซึ่งในบริบทของ Microsoft Power Platform Building Blocks จะหมายถึงเครื่องมือและ Components ที่ใช้สร้าง Automation Solution, Data Solution และ AI Solution
+2.1. Automation Solution: เชื่อมต่อระบบต่างๆ และทำงานซ้ำแทนคน ประกอบด้วยเครื่องมือดังนี้
+Power Automate: แพลตฟอร์มสร้าง Workflow ที่ทำงานได้ 4 ประเภท
+Instant (Manual): เริ่มทำงานเมื่อผู้ใช้กดปุ่ม เช่น ปุ่มใน Teams หรือ Power Apps
+Scheduled (ตามเวลา): ทำงานตามกำหนดเวลา เช่น ส่งรายงานทุกวันเวลา 9:00 น.
+Automated (ตาม Trigger): เริ่มทำงานอัตโนมัติเมื่อเกิดเหตุการณ์ เช่น มีอีเมลใหม่เข้ามา, มีไฟล์ถูกอัปโหลด
+AI-Powered (ใช้ AI Builder): ใช้ AI วิเคราะห์ข้อมูลและตัดสินใจ เช่น อ่านเอกสาร PDF และดึงข้อมูลที่ต้องการไปใส่ในระบบ
+Connectors: เชื่อมต่อกับระบบภายในและภายนอก (Standard/Premium/Custom Connectors)
+Standard Connectors: เช่น Outlook, SharePoint, OneDrive
+Premium Connectors: เช่น Salesforce, ServiceNow
+Custom Connectors: ผู้พัฒนาสร้างขึ้นเองเพื่อเชื่อมต่อกับระบบเฉพาะขององค์กร
+Use Cases ตัวอย่าง: 
+ส่งอีเมลแจ้งเตือนลูกค้าอัตโนมัติ
+รีเฟรช Power BI Dataset ทุกวันโดยไม่ต้องทำเอง
+จัดการเอกสาร เช่น เก็บไฟล์ PDF จากอีเมลลง SharePoint อัตโนมัติ
+2.2. Data Solution: จัดการข้อมูลตั้งแต่รวบรวม แปลง จนถึงการแสดงผล ประกอบด้วยเครื่องมือดังนี้
+Power Query: ใช้สำหรับ ETL (Extract, Transform, Load)
+Extract: ดึงข้อมูลจากแหล่งต่างๆ เช่น Excel, SQL Database
+Transform: ทำความสะอาด ปรับรูปแบบ และรวมข้อมูล
+Load: นำข้อมูลไปใช้ใน Power BI หรือระบบอื่น
+Power BI: ใช้สร้าง Interactive Dashboard และ Data Visualization 
+รองรับ Automatic Data Refresh เพื่อให้ข้อมูลทันสมัยอยู่เสมอ
+สามารถเจาะลึกข้อมูล (Drill Down) และใช้ Filter เพื่อค้นหาข้อมูลเฉพาะจุด
+Data Sources: แหล่งข้อมูลที่เชื่อมต่อได้
+Excel, SharePoint Lists, Dataverse, Dynamics 365
+Use Cases ตัวอย่าง
+รวมข้อมูลยอดขายจากหลายสาขามาแสดงใน Dashboard เดียว
+ทำความสะอาดข้อมูลลูกค้าก่อนนำไปใช้ใน AI Model
+สร้างรายงาน KPI ที่อัปเดตอัตโนมัติทุกเช้า
+2.3. AI Solution: ใช้ปัญญาประดิษฐ์ช่วยในการตัดสินใจและประมวลผลข้อมูล เพื่อเพิ่มความแม่นยำและความรวดเร็ว
+Microsoft 365 Copilot Chat: AI Assistant ที่ช่วยสรุปข้อมูล ตอบคำถาม และสร้างเนื้อหา
+AI Builder: ใช้ประมวลผลเอกสาร PDF, รูปภาพ, ข้อความ 
+Copilot Studio: สร้าง Custom AI Agent ที่ทำงานตามความต้องการเฉพาะขององค์กร
+Integration: 
+ผสาน AI เข้ากับ Power Automate เพื่อให้ Workflow ตัดสินใจได้เองจากข้อมูล
+เชื่อมกับ Microsoft Teams เพื่อให้พนักงานสื่อสารกับ AI ได้ง่าย
+รวมกับระบบอื่นๆ เพื่อให้ AI ช่วยวิเคราะห์และส่งคำตอบอัตโนมัติ
+Use Cases ตัวอย่าง
+AI อ่านและบันทึกข้อมูลจากเอกสาร PDF เข้าระบบ ERP
+สร้าง Chatbot ตอบคำถามลูกค้าโดยอัตโนมัติ
+วิเคราะห์ข้อมูลลูกค้าและแนะนำโปรโมชั่นที่เหมาะสม
+3. To-Be Process Design และ Solution Blueprint Development การพัฒนาโซลูชันดิจิทัลที่มีประสิทธิภาพไม่ได้หยุดแค่การวิเคราะห์สภาพปัจจุบัน (As-Is) แต่ต้อง ออกแบบสภาพที่ต้องการในอนาคต (To-Be) และสร้าง Solution Blueprint ที่เป็นภาพรวมของระบบและการทำงาน เพื่อเป็นคู่มือให้ทีมพัฒนานำไปสร้าง Proof-of-Concept หรือระบบจริงได้ถูกต้องและครบถ้วน
+3.1. To-be Process Design: ออกแบบกระบวนการใหม่โดยเปลี่ยนมุมมองจากการแบ่งตามแผนกเป็นการแบ่งตามประเภทงาน เพื่อมองกระบวนการแบบ End-to-End และลดการทำงานซ้ำซ้อนระหว่างฝ่าย โดยองค์ประกอบหลักที่ต้องระบุใน To-Be Process Design ประกอบด้วย
+Human Tasks (งานที่ทำโดยคน): รวมงานที่ต้องใช้การตัดสินใจ ความคิดสร้างสรรค์ หรือการติดต่อสื่อสารของคนจากทุกฝ่าย
+Automation/Digital Solution (งานที่ระบบทำแทน): ระบุงานที่ระบบดิจิทัลจะทำแทน เช่น การส่งข้อมูล การคำนวณ การแจ้งเตือน
+Legacy System (ระบบเดิม): ระบบเดิมที่ยังใช้งานอยู่และจุดที่ต้องเชื่อมต่อหรือดึงข้อมูล
+Address Decision Points (จุดตัดสินใจ): ระบุเงื่อนไขที่ส่งผลต่อการไหลของงาน
+3.2. Solution Blueprint: เพิ่มรายละเอียดบนแผนผัง To-Be Process Design จากการทดลองทำ สัมภาษณ์ผู้ปฏิบัติงานเพิ่มเติม และพิจารณา Data Schema หรือระบบ Legacy System ที่เกี่ยวข้อง เพื่อปรับปรุง Swimlane Diagram ให้มีรายละเอียดดังนี้
+User Workflow: ขั้นตอนการทำงานของผู้ใช้แต่ละประเภท
+อธิบายว่าผู้ใช้แต่ละประเภท (เช่น พนักงานปฏิบัติการ, ผู้จัดการ, ลูกค้า) ทำอะไรบ้างในแต่ละขั้นตอน
+ใช้ Swimlane Diagram เพื่อแยกบทบาทของผู้ใช้ชัดเจน
+Business Rules: กฎการทำงานของระบบตามเงื่อนไขและ Decision Points
+ระบุเงื่อนไขที่ระบบต้องทำตาม เช่น การตรวจสอบสิทธิ์ผู้ใช้, การอนุมัติคำสั่งซื้อเมื่อครบจำนวนขั้นต่ำ
+อ้างอิงจาก Decision Points ใน To-Be Process
+System Components: ส่วนประกอบของระบบและการเชื่อมต่อระหว่าง Building Blocks
+แสดงว่าแต่ละส่วนของระบบทำหน้าที่อะไร เช่น ฟอร์มรับข้อมูล, API Gateway, Data Storage
+ระบุการเชื่อมต่อระหว่างส่วนต่างๆ และเครื่องมือ (Building Blocks) ที่ใช้ เช่น Power Automate, Power BI, AI Builder
+Data Flow: การไหลของข้อมูลผ่านระบบและจุดเก็บข้อมูล
+แสดงเส้นทางการไหลของข้อมูลจากต้นทางถึงปลายทาง เช่น จากฟอร์ม → ฐานข้อมูล → Dashboard
+ระบุจุดเก็บข้อมูลชัดเจน (Data Storage Locations)
+Integration Points: จุดเชื่อมต่อกับระบบเดิมและ API Requirements
+ระบุ API Requirements 
+อธิบายว่าระบบจะเชื่อมกับ Legacy System อย่างไร เพื่อให้การทำงานเป็นแบบไร้รอยต่อ
+Technology Stack: เครื่องมือและเทคโนโลยีที่ใช้ในแต่ละส่วน
+ระบุเครื่องมือที่ใช้ในแต่ละส่วน เช่น Power Apps สำหรับ UI, Power Automate สำหรับ Workflow, Dataverse สำหรับ Data Storage
+อธิบายเหตุผลที่เลือกเทคโนโลยีนั้น เช่น รองรับการขยายระบบ, ลดค่าใช้จ่าย, ใช้ง่ายต่อผู้ใช้ปลายทาง
+4. Data Model, User Interface, Prototype Development (Optional) คือความรู้ความเข้าใจเรื่องการออกแบบรายละเอียดของดิจิทัลโซลูชัน เตรียมพร้อมสำหรับการพัฒนา Prototype ที่ใช้งานได้จริง 
+4.1. Data Model Design: ออกแบบโครงสร้างข้อมูลตาม Star Schema 
+องค์ประกอบสำคัญของ Star Schema
+Dimension Tables: เก็บข้อมูลหลัก (Entities) เช่น Customer, Product, Employee พร้อม Unique ID
+Fact Tables: เก็บข้อมูลเหตุการณ์ (Events) ที่เชื่อม Dimension Keys เข้าด้วยกัน
+Structured vs Unstructured Data: แยกประเภทข้อมูลและวิธีการจัดเก็บที่เหมาะสม
+4.2. User Interface Design: ออกแบบประสบการณ์ผู้ใช้ที่ใช้งานง่าย
+Data Collection Interface: 
+ใช้ Microsoft Forms (Simple) หมาะสำหรับการเก็บข้อมูลง่ายๆ เช่น แบบสอบถาม, แบบฟอร์มแจ้งปัญหา
+Power Apps (Complex Integration) เหมาะสำหรับการทำงานที่ซับซ้อน มีการเชื่อมต่อระบบหลายแหล่ง เช่น การสร้างแอปจัดการคำสั่งซื้อที่เชื่อมกับฐานข้อมูล
+Design Principles: 
+Single-column layout: จัดข้อมูลในคอลัมน์เดียวเพื่อให้ผู้ใช้เลื่อนดูง่าย
+Logical flow: ลำดับขั้นตอนการกรอกข้อมูลมีความต่อเนื่องและเข้าใจง่าย
+Clear labels: ใช้คำอธิบายชัดเจนและสั้น
+Appropriate validation: ใส่เงื่อนไขตรวจสอบข้อมูล เช่น ห้ามเว้นว่าง, ต้องกรอกอีเมลให้ถูกต้อง
+Dashboard Design: 
+ใช้ Power BI หรือ Excel เพื่อสร้าง Interactive Visualization
+ใส่ Filter, Drill Down และ Highlight เพื่อให้ผู้ใช้สำรวจข้อมูลได้ด้วยตนเอง
+ใช้สีและการจัดวางที่ช่วยให้เข้าใจข้อมูลได้เร็ว
+4.3. Prototype Development: สร้างต้นแบบที่ทำงานได้จริง
+ใช้ No-Code Tools เพื่อพัฒนาอย่างรวดเร็ว
+เช่น Power Apps, Power Automate, Power BI เพื่อพัฒนาได้เร็วและแก้ไขได้ง่าย
+ทดสอบ User Journey และ Business Logic
+ตรวจสอบว่ากระบวนการทำงานเป็นไปตามที่ออกแบบไว้หรือไม่
+ทดสอบว่าเงื่อนไข (Business Rules) ทำงานถูกต้อง เช่น การอนุมัติ, การส่งข้อมูล
+ยังไม่ต้องกังวลเรื่อง Security, Performance, Edge Cases ในขั้น Proof-of-Concept"
+</method component>
+
+<who is this for>
+"Business Analyst, นักพัฒนาระบบ, Citizen Developer ผู้มีหน้าที่ในการแปลงความต้องการทางธุรกิจเป็นระบบดิจิทัลที่ใช้งานได้จริง"
+</who is this for>
+
+<competency>
+"ผู้เรียนสามารถแปลงกระบวนการทำงานปัจจุบันเป็นโซลูชันดิจิทัล โดยนำเสนอเป็น Solution Blueprint และ/หรือ Digital Prototype ด้วยเครื่องมือ Microsoft Power Platform"
+</competency>
+
+<artifact assessment>
+""ผู้เรียนแสดง Solution Blueprint และ/หรือ Digital Solution Prototype โดยต้องจัดทำเอกสารในรูปแบบไฟล์ .docx หรือ .pdf ผ่านแพล็ตฟอร์มขององค์กร (เพื่อรักษาความลับทางการค้า) 
+ผู้เรียนส่ง To-be Swimlane Diagram (Solution Blueprint) 1 ไดอะแกรม ที่แบ่ง Lanes เป็น 3 ประเภท: Human Tasks (งานที่คนต้องทำ), Digital Solution (ระบบดิจิทัลที่จะสร้างใหม่), Legacy System (ระบบเดิมที่ยังใช้งานอยู่) แสดง:
+User Workflow: ขั้นตอนการทำงานของผู้ใช้แต่ละประเภท
+Business Rules: กฎการทำงานของระบบตาม Decision Points
+System Components: ส่วนประกอบของระบบและการเชื่อมต่อ Building Blocks
+Data Flow: การไหลของข้อมูลผ่านระบบและจุดเก็บข้อมูล
+Integration Points: จุดเชื่อมต่อกับระบบเดิม
+Technology Stack: เครื่องมือ Microsoft Power Platform ที่ใช้ในแต่ละส่วน
+กรณีที่ผู้เรียนได้นำ Blueprint ไปสร้างเป็น Digital Solution Prototype แล้วสามารถนำเสนอโซลูชันในรูปแบบ Presentation แทนได้โดยต้องจัดทำวิดีโอภายในองค์กร (เพื่อรักษาความลับทางการค้า) เป็นเวลา 3-7 นาที ในรูปแบบไฟล์ .mp4 และสไลด์ประกอบการนำเสนอ ที่อธิบาย:
+Problem Statement: อธิบายเหตุผลในการพัฒนาโซลูชันและปัญหาที่ดิจิทัลโซลูชันนี้ต้องการแก้ไข
+To-be Process: ภาพรวมของกระบวนการทำงานใหม่ แสดงการทำงานของโซลูชันดิจิทัลหรือระบบอัตโนมัติ
+User Workflow: ขั้นตอนการทำงานของผู้ใช้แต่ละประเภท
+System Description: คำอธิบายระบบที่รวมไปถึง System Components, Data Flow, Integration Points, Technology Stack, User Interface ที่ทำให้เห็นภาพชัดเจนว่าระบบทำงานอย่างไร
+
+## Scoring Rubric — To-be Swimlane Diagram
+| Artifact | “Yes” | “Almost” | “Not Yet” |
+|---------|--------|-----------|------------|
+| **To-be Swimlane Diagram** | - Swimlane Diagram แสดง User Workflow ที่สมบูรณ์ ครอบคลุมผู้ใช้แต่ละประเภท  <br>- มี Business Rules และ Decision Points ที่สะท้อนกระบวนการตัดสินใจจริง <br>- ระบุ System Components และ Building Blocks จาก Microsoft Power Platform ได้เหมาะสม <br>- แสดง Data Flow และ Integration Points กับระบบเดิมได้ชัดเจน Technology Stack สอดคล้องกับความต้องการธุรกิจ | - แสดง Swimlane Diagram แต่บางส่วนขาดรายละเอียด เช่น User Workflow ไม่ครอบคลุมผู้ใช้งานทุกกลุ่ม <br>- Business Rules หรือ Decision Points ยังไม่ชัดเจน <br>- System Components ระบุได้ แต่ยังไม่เชื่อมโยงกับ Building Blocks อย่างเฉพาะเจาะจง <br>- Data Flow หรือ Integration Points มีการระบุแต่ยังไม่สมบูรณ์ | - Swimlane Diagram ขาดรายละเอียดหรือไม่สะท้อนกระบวนการจริง <br>- ไม่มี Business Rules หรือ Decision Points ที่ชัดเจน <br>- System Components ไม่ระบุหรือไม่เหมาะสมกับความต้องการ <br>- ไม่สามารถทำความเข้าใจหรือเห็นภาพ Data Flow / Integration Points ได้ |
+| **Digital Solution Prototype Presentation** | - นำเสนอ Prototype ที่ทำงานได้จริงและสาธิตการทำงานของโซลูชันดิจิทัลหรือระบบอัตโนมัติได้ชัดเจน <br>- อธิบายปัญหาที่สะท้อนความต้องการและจำเป็นในการพัฒนาดิจิทัลโซลูชัน <br>- อธิบายกระบวนการทำงานใหม่ (To-Be Process) และ User Workflow ได้อย่างเป็นระบบ รวมถึงอธิบายส่วนประกอบและขั้นตอนการทำงานของดิจิทัลโซลูชันที่เห็นภาพได้ชัด <br>- Prototype สะท้อนการแก้ไขปัญหาทางธุรกิจได้ตรงตามความต้องการ | - สาธิตการทำงานได้แต่ยังขาดรายละเอียด เช่น การเชื่อมต่อกับ Legacy System หรือผู้ใช้งานยังไม่ครอบคลุม <br>- โซลูชันได้รับการอธิบายเป็นส่วนๆ แต่ไม่รวมเข้าเป็น To-Be Process ที่ต่อเนื่องและเป็นระบบ | - การสาธิตไม่ชัดเจนหรือไม่สะท้อนโซลูชันที่ต้องการ <br>- ไม่สามารถอธิบายการเชื่อมต่อระหว่างส่วนประกอบต่างๆ ได้ <br>- ไม่แสดงให้เห็นการแก้ไขปัญหาทางธุรกิจ |""
+</artifact assessment>
+
+<output>
+{
+  "alignment_result": true,
+  "alignment_explanation": "The overall content focuses on teaching the transformation of processes into Solution Blueprints/Prototypes using Microsoft Power Platform, aligning with the specified competencies and enabling learners to create To-be Swimlane Diagrams or Prototypes according to assessment criteria.",
+  "coverage_result": true,
+  "coverage_explanation": "The method components cover all essential topics required for the assessment: As-Is mapping, Process improvement, To-Be design, Swimlane Diagram with Human/Digital/Legacy lanes, Business Rules, System Components, Data Flow, Integration Points, Technology Stack, and steps for creating Prototypes/Presentations.",
+  "learner_relevance_result": true,
+  "learner_relevance_explanation": "The content level (process modeling, Power Platform Building Blocks, data model, UI, prototyping) is appropriate for the target audience (Business Analysts, System Developers, Citizen Developers), being neither too simplistic nor unnecessarily complex.",
+  "consistency_result": true,
+  "consistency_explanation": "The structure is systematically ordered from As-Is analysis → identifying opportunities → To-Be design → specifying Blueprint/Technology → developing Prototype, with connections between sections. There are minor repetitions in details but no contradictions.",
+  "readability_result": true,
+  "readability_explanation": "The text is organized into subheadings and clearly summarizes actionable points (As-Is, Process Improvement, Building Blocks, To-Be, Data/UI/Prototype), making it easy to read and apply immediately. Although lengthy, it is well-ordered and clear.",
+  "format_criteria_result": true,
+  "format_criteria_explanation": "There is an introductory paragraph linking to competencies/learners, and it is organized into main-subheadings/bullets with brief explanations as per the specified format."
+}
+</output>
+
+### Additional Requirements
+- All suggestions must directly solve the issue described in your analysis.
+- Suggested versions must be **concise** and **aligned with the user’s intent**.
+</instruction>
+
+**Please assess the provided <method_component> content below following the <instruction> described above**
+
+<method component>
+{{method_component}}
+</method component>
+"""
+EVAL_METHOD_COMP_OUTPUT = {
+  "title": "evaluate_method_components",
+  "description": "Assess the quality of method components for a micro-credential overview using seven dimensions (Alignment, Coverage, Learner Relevance, Consistency, Readability, Faithfulness, Format Criteria). For each dimension return a boolean result and a short explanation.",
+  "type": "object",
+  "properties": {
+    "alignment_result": {
+      "type": "boolean",
+      "description": "true if the content directly supports the targeted competency and enables learners to demonstrate the intended performance; false otherwise."
+    },
+    "alignment_explanation": {
+      "type": "string",
+      "description": "A short explanation justifying the alignment_result."
+    },
+    "coverage_result": {
+      "type": "boolean",
+      "description": "true if all necessary topics are covered to achieve the artifact assessment with no key elements missing; false otherwise."
+    },
+    "coverage_explanation": {
+      "type": "string",
+      "description": "A short explanation justifying the coverage_result."
+    },
+    "learner_relevance_result": {
+      "type": "boolean",
+      "description": "true if the content matches the expected prior knowledge level and is appropriately challenging; false otherwise."
+    },
+    "learner_relevance_explanation": {
+      "type": "string",
+      "description": "A short explanation justifying the learner_relevance_result."
+    },
+    "consistency_result": {
+      "type": "boolean",
+      "description": "true if components are logically connected, progressive, and free of redundancy; false otherwise."
+    },
+    "consistency_explanation": {
+      "type": "string",
+      "description": "A short explanation justifying the consistency_result."
+    },
+    "readability_result": {
+      "type": "boolean",
+      "description": "true if descriptions and rubrics are clear, logical, and coherent; false otherwise."
+    },
+    "readability_explanation": {
+      "type": "string",
+      "description": "A short explanation justifying the readability_result."
+    },
+    "format_criteria_result": {
+      "type": "boolean",
+      "description": "true if the information includes an introduction linking competency and audience and is structured into topics/sub-topics or bullet points with brief descriptions; false otherwise."
+    },
+    "format_criteria_explanation": {
+      "type": "string",
+      "description": "A short explanation justifying the format_criteria_result."
+    }
+  },
+  "required": [
+    "alignment_result",
+    "alignment_explanation",
+    "coverage_result",
+    "coverage_explanation",
+    "learner_relevance_result",
+    "learner_relevance_explanation",
+    "consistency_result",
+    "consistency_explanation",
+    "readability_result",
+    "readability_explanation",
+    "format_criteria_result",
+    "format_criteria_explanation"
+  ],
+  "additionalProperties": False,
+  "strict": False
+}
+EVAL_METHOD_COMP_WEIGHT = {
+    "alignment_result": 1,
+    "coverage_result": 1,
+    "learner_relevance_result": 1,
+    "consistency_result": 1,
+    "readability_result": 1,
+    "format_criteria_result":1
+}
+
+EVAL_KEY_METHOD_PROMPT = """
+<instruction>
+**Your Goal**: Evaluate the <key method> which summarized the <method component> to tell the learner about the overview of the micro-credential teaching content in several paragraph. The key method aim to make the learner understand their learning path and content included in the course. You must assess quality of <key method> and provide targeted refinement suggestions using the following dimensions.
+
+<method component>
+{{method_component}}
+</method component>
+
+---
+## DIMENSIONS
+1. **Concisability**
+evaluate whether the key method is clearly and concisely described, avoiding redundancy and ensuring that all essential information is included in a well-summarized form.
+- Output **true** if the content is clear, concise, and includes all essential information without redundancy.
+- Output **false** if the content is unclear, redundant, or missing essential information.
+2. **Coverage**
+evaluate whether the key method cover all method component and not compress any necessary information. learner should still understand overall of the method or procedures to achieve the competency
+- Output **true** if all components of the method are covered and no necessary information is compressed, allowing the learner to understand the overall method or procedures.
+- Output **false** if any components are missing or necessary information is compressed, hindering the learner's understanding of the method or procedures.
+3. **Format Criteria**
+Evaluate the information that is structured as a summarized paragraph. The content should constructed from <target learner> + <action verb that demonstrates method / procedures>
+- Output **true** if the format of the information is similar to the defined format.
+- Output **false** if the format is vague, unfocused, too long, or lacks a clear structure.
+---
+
+## YOUR TASKS
+### **Analyze the User Input**
+For each dimension:
+- Evaluate whether it meets the dimension's requirements.
+- Return only **true/false** ('<dimension's result>').
+- Provide a short explanation of your reasoning ('<dimension's explanation>').
+---
+
+## OUTPUT FORMAT
+Respond strictly in this JSON structure:
+{
+"concisability_result": <dimension's result>,
+"concisability_explanation": <dimension's explanation>,
+"coverage_result": <dimension's result>,
+"coverage_explanation": <dimension's explanation>,
+"format_criteria_result": <dimension's result>,
+"format_criteria_explanation": <dimension's explanation>,
+}
+---
+
+## EXAMPLE
+### *example 1*
+<key method>
+"ผู้เรียนแปลงกระบวนการทำงานปัจจุบันเป็นโซลูชันดิจิทัล โดยพัฒนา Solution Blueprint ที่ใช้ Business Process Modeling เพื่อวิเคราะห์กระบวนการปัจจุบัน (As-is) และออกแบบกระบวนการใหม่ (To-be) ด้วย Swimlane Diagram จากนั้นเลือกใช้ Digital Building Blocks จาก Microsoft Power Platform เพื่อประกอบเป็น Solution Blueprint ครอบคลุม Automation Solution, Data Solution และ AI Solution เพื่อตอบสนองความต้องการทางธุรกิจ"
+</key method>
+
+<method component>
+"การออกแบบโซลูชันดิจิทัลที่ถูกต้องและรวดเร็วต้องอาศัยกระบวนการที่เป็นระบบและเครื่องมือที่ช่วยจัดระเบียบความคิด รวมถึงต้องมีความรู้ความเข้าใจเกี่ยวกับองค์ประกอบของดิจิทัลโซลูชันและความสามารถของเครื่องมือที่จะใช้พัฒนาโซลูชัน
+ผู้เรียนจะฝึกใช้ Business Process Modeling, Gap Analysis และ Digital Building Blocks เพื่อแปลงความต้องการทางธุรกิจเป็นโซลูชันดิจิทัลที่ใช้งานได้จริง โดยเนื้อหาทักษะจะครอบคลุม 4 องค์ประกอบสำคัญดังนี้:
+1. Business Process Modeling และ Gap Analysis คือ การวิเคราะห์กระบวนการทำงานอย่างเป็นระบบเพื่อระบุโอกาสในการปรับปรุงด้วยเทคโนโลยีดิจิทัล โดยใช้เครื่องมือ Swimlane Diagram เพื่อให้เห็นภาพชัดเจนของ Workflow และจุดที่ต้องปรับปรุง
+1.1. As-is Process Mapping: วิเคราะห์กระบวนการปัจจุบันโดยใช้ Swimlane Diagram เพื่อทำความเข้าใจการทำงานที่เกิดขึ้นจริง (รูปที่ 1)
+กำหนด Scope และผู้เกี่ยวข้อง (Players/Lanes): ระบุขอบเขตของกระบวนการ จุดเริ่มต้น-สิ้นสุด และแผนก/บุคคลที่เกี่ยวข้อง
+ระบุกิจกรรมหลัก (Key Activities) และลำดับการทำงาน: ลิสต์งานทั้งหมดในกระบวนการและเรียงลำดับตามลำดับเวลา
+เชื่อมโยงการไหลของงาน (Flow) และจุดส่งต่อ (Handoffs): วาดเส้นเชื่อมและให้ความสำคัญกับจุดที่งานข้ามระหว่างแผนก
+ตรวจสอบความถูกต้อง: นำ Diagram ไปให้เจ้าของกระบวนการตรวจสอบและ Role-Play เพื่อหาข้อผิดพลาด
+1.2 Process Improvement Discovery: การค้นหาและวิเคราะห์โอกาสในการปรับปรุงกระบวนการทำงาน เป็นขั้นตอนสำคัญหลังจากที่ผู้เรียนได้ทำการวิเคราะห์กระบวนการปัจจุบัน (As-is) แล้ว เพื่อหาจุดที่เป็นปัญหา (Pain Points) และโอกาสพัฒนา (Opportunities) อย่างเป็นระบบ โดยพิจารณาใน 3 มิติหลัก (รูปที่ 2) ดังนี้
+People (บุคลากร)
+Skills (ทักษะ): ตรวจสอบว่าบุคลากรมีทักษะเพียงพอต่อการปฏิบัติงานหรือไม่ เช่น ขาดความรู้ด้านการใช้เครื่องมือดิจิทัล, ต้องใช้เวลามากในการฝึกอบรม
+Bottleneck (จุดคอขวด): หาช่วงที่งานติดขัดเพราะต้องรอการอนุมัติ, รอคนเพียงบางตำแหน่ง หรือใช้เวลามากเกินความจำเป็น
+Handoffs (การส่งต่องาน): วิเคราะห์ว่าการส่งต่อข้อมูลหรือเอกสารระหว่างบุคคลหรือหน่วยงานทำให้เกิดความล่าช้าหรือข้อมูลสูญหายหรือไม่
+Process (กระบวนการ)
+Redundancy (ความซ้ำซ้อน): มีขั้นตอนที่ทำซ้ำโดยไม่จำเป็นหรือไม่ เช่น การบันทึกข้อมูลซ้ำในหลายระบบ
+Delays (ความล่าช้า): ขั้นตอนใดใช้เวลานานกว่ามาตรฐาน หรือเกิดการรอคอยที่ไม่สร้างคุณค่า
+Complexity (ความซับซ้อน): มีขั้นตอนที่ซับซ้อนเกินความจำเป็น ทำให้บุคลากรสับสนหรือเกิดข้อผิดพลาดง่าย
+3. Technology (เทคโนโลยี)
+Manual Work (งานที่ทำด้วยมือ): งานที่สามารถทำให้อัตโนมัติได้ แต่ยังคงทำด้วยคน เช่น การกรอกข้อมูลซ้ำ หรือการรวมไฟล์ด้วยตนเอง
+Tools (เครื่องมือ): เครื่องมือปัจจุบันไม่เพียงพอหรือไม่มีการบูรณาการระหว่างระบบ ทำให้เกิดช่องว่างในการทำงาน
+Data (ข้อมูล): ข้อมูลไม่ครบถ้วน, ไม่มีมาตรฐาน หรือไม่สามารถเข้าถึงได้ง่าย ทำให้การตัดสินใจล่าช้าหรือผิดพลาด
+
+รูปที่ 1 ตัวอย่าง As-is Swimlane Diagram จากกระบวนการ Business Process Modeling
+
+รูปที่ 2 Process Improvement Discovery Framework
+2. Digital Solution Architecture และ Building Blocks คือ การออกแบบโครงสร้างของโซลูชันดิจิทัลโดยมองภาพรวมว่ามีองค์ประกอบ (Building Blocks) อะไรบ้างและแต่ละส่วนทำงานร่วมกันอย่างไร เพื่อให้ได้โซลูชันที่ตอบโจทย์ปัญหาและความต้องการของธุรกิจ ซึ่งในบริบทของ Microsoft Power Platform Building Blocks จะหมายถึงเครื่องมือและ Components ที่ใช้สร้าง Automation Solution, Data Solution และ AI Solution
+2.1. Automation Solution: เชื่อมต่อระบบต่างๆ และทำงานซ้ำแทนคน ประกอบด้วยเครื่องมือดังนี้
+Power Automate: แพลตฟอร์มสร้าง Workflow ที่ทำงานได้ 4 ประเภท
+Instant (Manual): เริ่มทำงานเมื่อผู้ใช้กดปุ่ม เช่น ปุ่มใน Teams หรือ Power Apps
+Scheduled (ตามเวลา): ทำงานตามกำหนดเวลา เช่น ส่งรายงานทุกวันเวลา 9:00 น.
+Automated (ตาม Trigger): เริ่มทำงานอัตโนมัติเมื่อเกิดเหตุการณ์ เช่น มีอีเมลใหม่เข้ามา, มีไฟล์ถูกอัปโหลด
+AI-Powered (ใช้ AI Builder): ใช้ AI วิเคราะห์ข้อมูลและตัดสินใจ เช่น อ่านเอกสาร PDF และดึงข้อมูลที่ต้องการไปใส่ในระบบ
+Connectors: เชื่อมต่อกับระบบภายในและภายนอก (Standard/Premium/Custom Connectors)
+Standard Connectors: เช่น Outlook, SharePoint, OneDrive
+Premium Connectors: เช่น Salesforce, ServiceNow
+Custom Connectors: ผู้พัฒนาสร้างขึ้นเองเพื่อเชื่อมต่อกับระบบเฉพาะขององค์กร
+Use Cases ตัวอย่าง:
+ส่งอีเมลแจ้งเตือนลูกค้าอัตโนมัติ
+รีเฟรช Power BI Dataset ทุกวันโดยไม่ต้องทำเอง
+จัดการเอกสาร เช่น เก็บไฟล์ PDF จากอีเมลลง SharePoint อัตโนมัติ
+2.2. Data Solution: จัดการข้อมูลตั้งแต่รวบรวม แปลง จนถึงการแสดงผล ประกอบด้วยเครื่องมือดังนี้
+Power Query: ใช้สำหรับ ETL (Extract, Transform, Load)
+Extract: ดึงข้อมูลจากแหล่งต่างๆ เช่น Excel, SQL Database
+Transform: ทำความสะอาด ปรับรูปแบบ และรวมข้อมูล
+Load: นำข้อมูลไปใช้ใน Power BI หรือระบบอื่น
+Power BI: ใช้สร้าง Interactive Dashboard และ Data Visualization
+รองรับ Automatic Data Refresh เพื่อให้ข้อมูลทันสมัยอยู่เสมอ
+สามารถเจาะลึกข้อมูล (Drill Down) และใช้ Filter เพื่อค้นหาข้อมูลเฉพาะจุด
+Data Sources: แหล่งข้อมูลที่เชื่อมต่อได้
+Excel, SharePoint Lists, Dataverse, Dynamics 365
+Use Cases ตัวอย่าง
+รวมข้อมูลยอดขายจากหลายสาขามาแสดงใน Dashboard เดียว
+ทำความสะอาดข้อมูลลูกค้าก่อนนำไปใช้ใน AI Model
+สร้างรายงาน KPI ที่อัปเดตอัตโนมัติทุกเช้า
+2.3. AI Solution: ใช้ปัญญาประดิษฐ์ช่วยในการตัดสินใจและประมวลผลข้อมูล เพื่อเพิ่มความแม่นยำและความรวดเร็ว
+Microsoft 365 Copilot Chat: AI Assistant ที่ช่วยสรุปข้อมูล ตอบคำถาม และสร้างเนื้อหา
+AI Builder: ใช้ประมวลผลเอกสาร PDF, รูปภาพ, ข้อความ
+Copilot Studio: สร้าง Custom AI Agent ที่ทำงานตามความต้องการเฉพาะขององค์กร
+Integration:
+ผสาน AI เข้ากับ Power Automate เพื่อให้ Workflow ตัดสินใจได้เองจากข้อมูล
+เชื่อมกับ Microsoft Teams เพื่อให้พนักงานสื่อสารกับ AI ได้ง่าย
+รวมกับระบบอื่นๆ เพื่อให้ AI ช่วยวิเคราะห์และส่งคำตอบอัตโนมัติ
+Use Cases ตัวอย่าง
+AI อ่านและบันทึกข้อมูลจากเอกสาร PDF เข้าระบบ ERP
+สร้าง Chatbot ตอบคำถามลูกค้าโดยอัตโนมัติ
+วิเคราะห์ข้อมูลลูกค้าและแนะนำโปรโมชั่นที่เหมาะสม
+3. To-Be Process Design และ Solution Blueprint Development การพัฒนาโซลูชันดิจิทัลที่มีประสิทธิภาพไม่ได้หยุดแค่การวิเคราะห์สภาพปัจจุบัน (As-Is) แต่ต้อง ออกแบบสภาพที่ต้องการในอนาคต (To-Be) และสร้าง Solution Blueprint ที่เป็นภาพรวมของระบบและการทำงาน เพื่อเป็นคู่มือให้ทีมพัฒนานำไปสร้าง Proof-of-Concept หรือระบบจริงได้ถูกต้องและครบถ้วน
+3.1. To-be Process Design: ออกแบบกระบวนการใหม่โดยเปลี่ยนมุมมองจากการแบ่งตามแผนกเป็นการแบ่งตามประเภทงาน เพื่อมองกระบวนการแบบ End-to-End และลดการทำงานซ้ำซ้อนระหว่างฝ่าย โดยองค์ประกอบหลักที่ต้องระบุใน To-Be Process Design ประกอบด้วย
+Human Tasks (งานที่ทำโดยคน): รวมงานที่ต้องใช้การตัดสินใจ ความคิดสร้างสรรค์ หรือการติดต่อสื่อสารของคนจากทุกฝ่าย
+Automation/Digital Solution (งานที่ระบบทำแทน): ระบุงานที่ระบบดิจิทัลจะทำแทน เช่น การส่งข้อมูล การคำนวณ การแจ้งเตือน
+Legacy System (ระบบเดิม): ระบบเดิมที่ยังใช้งานอยู่และจุดที่ต้องเชื่อมต่อหรือดึงข้อมูล
+Address Decision Points (จุดตัดสินใจ): ระบุเงื่อนไขที่ส่งผลต่อการไหลของงาน
+3.2. Solution Blueprint: เพิ่มรายละเอียดบนแผนผัง To-Be Process Design จากการทดลองทำ สัมภาษณ์ผู้ปฏิบัติงานเพิ่มเติม และพิจารณา Data Schema หรือระบบ Legacy System ที่เกี่ยวข้อง เพื่อปรับปรุง Swimlane Diagram ให้มีรายละเอียดดังนี้
+User Workflow: ขั้นตอนการทำงานของผู้ใช้แต่ละประเภท
+อธิบายว่าผู้ใช้แต่ละประเภท (เช่น พนักงานปฏิบัติการ, ผู้จัดการ, ลูกค้า) ทำอะไรบ้างในแต่ละขั้นตอน
+ใช้ Swimlane Diagram เพื่อแยกบทบาทของผู้ใช้ชัดเจน
+Business Rules: กฎการทำงานของระบบตามเงื่อนไขและ Decision Points
+ระบุเงื่อนไขที่ระบบต้องทำตาม เช่น การตรวจสอบสิทธิ์ผู้ใช้, การอนุมัติคำสั่งซื้อเมื่อครบจำนวนขั้นต่ำ
+อ้างอิงจาก Decision Points ใน To-Be Process
+System Components: ส่วนประกอบของระบบและการเชื่อมต่อระหว่าง Building Blocks
+แสดงว่าแต่ละส่วนของระบบทำหน้าที่อะไร เช่น ฟอร์มรับข้อมูล, API Gateway, Data Storage
+ระบุการเชื่อมต่อระหว่างส่วนต่างๆ และเครื่องมือ (Building Blocks) ที่ใช้ เช่น Power Automate, Power BI, AI Builder
+Data Flow: การไหลของข้อมูลผ่านระบบและจุดเก็บข้อมูล
+แสดงเส้นทางการไหลของข้อมูลจากต้นทางถึงปลายทาง เช่น จากฟอร์ม → ฐานข้อมูล → Dashboard
+ระบุจุดเก็บข้อมูลชัดเจน (Data Storage Locations)
+Integration Points: จุดเชื่อมต่อกับระบบเดิมและ API Requirements
+ระบุ API Requirements
+อธิบายว่าระบบจะเชื่อมกับ Legacy System อย่างไร เพื่อให้การทำงานเป็นแบบไร้รอยต่อ
+Technology Stack: เครื่องมือและเทคโนโลยีที่ใช้ในแต่ละส่วน
+ระบุเครื่องมือที่ใช้ในแต่ละส่วน เช่น Power Apps สำหรับ UI, Power Automate สำหรับ Workflow, Dataverse สำหรับ Data Storage
+อธิบายเหตุผลที่เลือกเทคโนโลยีนั้น เช่น รองรับการขยายระบบ, ลดค่าใช้จ่าย, ใช้ง่ายต่อผู้ใช้ปลายทาง
+4. Data Model, User Interface, Prototype Development (Optional) คือความรู้ความเข้าใจเรื่องการออกแบบรายละเอียดของดิจิทัลโซลูชัน เตรียมพร้อมสำหรับการพัฒนา Prototype ที่ใช้งานได้จริง
+4.1. Data Model Design: ออกแบบโครงสร้างข้อมูลตาม Star Schema
+องค์ประกอบสำคัญของ Star Schema
+Dimension Tables: เก็บข้อมูลหลัก (Entities) เช่น Customer, Product, Employee พร้อม Unique ID
+Fact Tables: เก็บข้อมูลเหตุการณ์ (Events) ที่เชื่อม Dimension Keys เข้าด้วยกัน
+Structured vs Unstructured Data: แยกประเภทข้อมูลและวิธีการจัดเก็บที่เหมาะสม
+4.2. User Interface Design: ออกแบบประสบการณ์ผู้ใช้ที่ใช้งานง่าย
+Data Collection Interface:
+ใช้ Microsoft Forms (Simple) หมาะสำหรับการเก็บข้อมูลง่ายๆ เช่น แบบสอบถาม, แบบฟอร์มแจ้งปัญหา
+Power Apps (Complex Integration) เหมาะสำหรับการทำงานที่ซับซ้อน มีการเชื่อมต่อระบบหลายแหล่ง เช่น การสร้างแอปจัดการคำสั่งซื้อที่เชื่อมกับฐานข้อมูล
+Design Principles:
+Single-column layout: จัดข้อมูลในคอลัมน์เดียวเพื่อให้ผู้ใช้เลื่อนดูง่าย
+Logical flow: ลำดับขั้นตอนการกรอกข้อมูลมีความต่อเนื่องและเข้าใจง่าย
+Clear labels: ใช้คำอธิบายชัดเจนและสั้น
+Appropriate validation: ใส่เงื่อนไขตรวจสอบข้อมูล เช่น ห้ามเว้นว่าง, ต้องกรอกอีเมลให้ถูกต้อง
+Dashboard Design:
+ใช้ Power BI หรือ Excel เพื่อสร้าง Interactive Visualization
+ใส่ Filter, Drill Down และ Highlight เพื่อให้ผู้ใช้สำรวจข้อมูลได้ด้วยตนเอง
+ใช้สีและการจัดวางที่ช่วยให้เข้าใจข้อมูลได้เร็ว
+4.3. Prototype Development: สร้างต้นแบบที่ทำงานได้จริง
+ใช้ No-Code Tools เพื่อพัฒนาอย่างรวดเร็ว
+เช่น Power Apps, Power Automate, Power BI เพื่อพัฒนาได้เร็วและแก้ไขได้ง่าย
+ทดสอบ User Journey และ Business Logic
+ตรวจสอบว่ากระบวนการทำงานเป็นไปตามที่ออกแบบไว้หรือไม่
+ทดสอบว่าเงื่อนไข (Business Rules) ทำงานถูกต้อง เช่น การอนุมัติ, การส่งข้อมูล
+ยังไม่ต้องกังวลเรื่อง Security, Performance, Edge Cases ในขั้น Proof-of-Concept"
+</method component>
+
+<output>
+{
+"concisability_result": "true",
+"concisability_explanation": "The text is short, concise, and not redundant. It clearly summarizes the main workflow (As‑is → To‑be → Blueprint → Select Building Blocks) — Suggestion: Add short phrases to specify learner activities, such as 'practice analyzing As‑is, identify Pain points, and create Prototype' to highlight practical learning outcomes.",
+"coverage_result": "false",
+"coverage_explanation": "The content is condensed to the point of missing key components from the method component, such as Process Improvement Discovery (People/Process/Technology), details of the Solution Blueprint (Data Flow, Integration Points, Technology Stack), and parts of the Data Model/UI/Prototype — Suggestion: Add short sentences listing these missing parts to provide learners with a complete picture of the practical steps.",
+"format_criteria_result": "true",
+"format_criteria_explanation": "The format meets the criteria, starting with 'Learner' (target learner) followed by action verbs (transform, develop, analyze, design, select) making it a well-structured summary paragraph."
+}
+</output>
+
+### Additional Requirements
+- All suggestions must directly solve the issue described in your analysis.
+- Suggested versions must be **concise**, **specific**, and **aligned with the user’s intent**.
+</instruction>
+
+**Please assess the provided <key method> content below following the <instruction> described above**
+
+<key method>
+{{key_method}}
+</key method>
+"""
+EVAL_KEY_METHOD_OUTPUT = {
+  "title": "evaluate_key_method",
+  "description": "Assess a summarized key method against dimensions (Concisability, Coverage, Format Criteria) and provide boolean results with brief explanations.",
+  "type": "object",
+  "properties": {
+    "concisability_result": {
+      "type": "boolean",
+      "description": "Result for Concisability dimension: 'true' if the key method is clearly and concisely described without redundancy and includes essential information; otherwise 'false'."
+    },
+    "concisability_explanation": {
+      "type": "string",
+      "description": "A short explanation (one or two sentences) justifying the concisability_result."
+    },
+    "coverage_result": {
+      "type": "boolean",
+      "description": "Result for Coverage dimension: 'true' if the key method covers all method component elements and preserves necessary procedural detail for learner understanding; otherwise 'false'."
+    },
+    "coverage_explanation": {
+      "type": "string",
+      "description": "A short explanation (one or two sentences) justifying the coverage_result."
+    },
+    "format_criteria_result": {
+      "type": "boolean",
+      "description": "Result for Format Criteria: 'true' if the summary is structured as a paragraph that begins with the target learner and uses action verbs to describe method/procedures; otherwise 'false'."
+    },
+    "format_criteria_explanation": {
+      "type": "string",
+      "description": "A short explanation (one or two sentences) justifying the format_criteria_result."
+    }
+  },
+  "required": [
+    "concisability_result",
+    "concisability_explanation",
+    "coverage_result",
+    "coverage_explanation",
+    "format_criteria_result",
+    "format_criteria_explanation"
+  ],
+  "additionalProperties": False,
+  "strict": False
+}
+EVAL_KEY_METHOD_WEIGHT = {
+    "concisability_result": 1,
+    "coverage_result": 1,
+    "format_criteria_result": 1,
+}
+
+EVAL_DESCRIPTION_PROMPT = """
+<instruction>
+**Your Goal**: Evaluate the <description> which describing the overall of the micro-credential, included with the content, objective, what will you earn at the end of the course in paragraph. You must assess quality of <description> and provide targeted refinement suggestions using the following dimensions with micro-credential's <competency> and <key method> context provided below
+
+<competency>
+{{competency}}
+<competency>
+
+<key_method>
+{{key_method}}
+<key method>
+
+---
+## DIMENSIONS
+1. **Concisability**
+evaluate whether the <description> is clearly and concisely described, avoiding redundancy and ensuring that all essential information is included in a well-summarized form.
+   - Output **true** if the description is succinct, free of unnecessary repetition, and includes all critical information in a clear and concise manner.
+   - Output **false** if the description is verbose, contains redundant information, or omits essential details.
+2. **Coverage**  
+evaluate whether the <description> cover all necessary content included with <competency> and <key method>. learner should understand what to achieve and overview of how to achieve the competency
+   - Output **true** if the description comprehensively covers all aspects of the competency and key method, providing a clear understanding of objectives and methods.
+   - Output **false** if the description lacks important content, leaving gaps in understanding the competency or key method.
+3. **Attractive**
+evaluate that the description employs an engaging and motivating tone that captures the reader’s attention, encourages further exploration, and inspires interest in learning the micro-credential.
+   - Output **true** if the description is written in an engaging, motivating tone that captivates the reader and stimulates interest.
+   - Output **false** if the description is dull, unengaging, or fails to inspire interest in the micro-credential.
+4. **Format Criteria**  
+Evaluate the information that is structured as a summarized paragraph. The content should implicitly summarized from <introduction> + <competency> + <key method>
+   - Output **true** if the format of the information is similar to the defined format.  
+   - Output **false** if the format is vague, unfocused, too long, or lacks a clear structure.
+---
+
+## YOUR TASKS
+### **Analyze the User Input**
+For each dimension:
+- Evaluate whether it meets the dimension's requirements.  
+- Return only **true/false** ('<dimension's result>').  
+- Provide a short explanation of your reasoning ('<dimension's explanation>').
+---
+
+## OUTPUT FORMAT
+Respond strictly in this JSON structure:
+{
+    "concisability_result": <dimension's result>,
+    "concisability_explanation": <dimension's explanation>,
+    "coverage_result": <dimension's result>,
+    "coverage_explanation": <dimension's explanation>,
+    "attractive_result": <dimension's result>,
+    "attractive_explanation": <dimension's explanation>,
+    "format_criteria_result": <dimension's result>,
+    "format_criteria_explanation": <dimension's explanation>,
+}
+---
+
+## EXAMPLE
+### *example 1*
+<description>
+"ในยุคของ Digital Transformation ที่องค์กรต้องการนำระบบดิจิทัลมาใช้แทนกระบวนการทำงานแบบดั้งเดิม ผู้เรียนจะได้พัฒนาทักษะการออกแบบโซลูชันดิจิทัลที่ตอบโจทย์ธุรกิจอย่างเป็นระบบ ตั้งแต่การวิเคราะห์กระบวนการทำงานปัจจุบัน (As-is Process Mapping) การระบุช่องว่างและโอกาสในการปรับปรุง (Gap Analysis) ไปจนถึงการออกแบบ Solution Blueprint ที่สามารถสื่อสาร To-be Process Mapping ทั้งในส่วนของ workflow, data model และ solution components หลักสูตรนี้ใช้ Solution Components จาก Microsoft Power Platform เป็นเครื่องมือเพื่อสร้าง  Automation Solution, Data Solution และ AI Solution แบบ Low-Code/No-Code ผู้เรียนสามารถนำ Solution Blueprint ไปพัฒนาเป็น Prototype ได้จริง เพื่อทดสอบและนำไปใช้จริงในองค์กรต่อไป"
+</description>
+
+<competency>
+"ผู้เรียนสามารถแปลงกระบวนการทำงานปัจจุบันเป็นโซลูชันดิจิทัล โดยนำเสนอเป็น Solution Blueprint และ/หรือ Digital Prototype ด้วยเครื่องมือ Microsoft Power Platform"
+<competency>
+
+<key method>
+"ผู้เรียนแปลงกระบวนการทำงานปัจจุบันเป็นโซลูชันดิจิทัล โดยพัฒนา Solution Blueprint ที่ใช้ Business Process Modeling เพื่อวิเคราะห์กระบวนการปัจจุบัน (As-is) และออกแบบกระบวนการใหม่ (To-be) ด้วย Swimlane Diagram จากนั้นเลือกใช้ Digital Building Blocks จาก Microsoft Power Platform เพื่อประกอบเป็น Solution Blueprint ครอบคลุม Automation Solution, Data Solution และ AI Solution เพื่อตอบสนองความต้องการทางธุรกิจ "
+<key method>
+
+<output>
+{
+    "concisability_result": "true",
+    "concisability_explanation": "The explanation is concise and not overly redundant. The main points (As-is analysis, Gap Analysis, To-be design, use of Power Platform, development of Prototype) are covered. However, the first sentence is long and could be shortened for brevity. A concise starting example: 'This course teaches digital solution design using Microsoft Power Platform, from As-is analysis to creating a ready-to-use Prototype.'",
+    "coverage_result": "false",
+    "coverage_explanation": "Lacks technical references found in key methods, such as the use of Business Process Modeling and Swimlane Diagram, and the need to select Digital Building Blocks from Microsoft Power Platform to form a Solution Blueprint. Suggestion: Add a short sentence like 'The course uses Business Process Modeling (including Swimlane Diagram) to analyze As-is and design To-be, and selects Digital Building Blocks from Microsoft Power Platform to cover Automation, Data, and AI.'",
+    "attractive_result": "false",
+    "attractive_explanation": "The tone is technically informative but somewhat formal and not engaging. It should highlight tangible benefits and target audience, such as 'Learners will be able to create a Solution Blueprint that transforms into a practical Prototype, reducing manual work and increasing organizational efficiency,' to make the text more appealing.",
+    "format_criteria_result": "true",
+    "format_criteria_explanation": "Organized as a single paragraph summarizing the introduction, purpose, and method (introduction + competency + key method) clearly. The format meets the criteria but should include short sentences as suggested in coverage and attractive sections while maintaining a single-paragraph format."
+}
+</output>
+
+### Additional Requirements
+- All suggestions must directly solve the issue described in your analysis.  
+- Suggested versions must be **concise**, **specific**, and **aligned with the user’s intent**.  
+</instruction>
+
+**Please assess the provided <description> content below following the <instruction> described above**
+
+<description>
+{{description}}
+</description>
+"""
+EVAL_DESCRIPTION_OUTPUT = {
+  "title": "evaluate_description",
+  "description": "Assess a micro-credential description against dimensions (Concisability, Coverage, Attractive, Format Criteria) given the competency and key method context; return true/false for each dimension plus a short explanation.",
+  "type": "object",
+  "properties": {
+    "concisability_result": {
+      "type": "boolean",
+      "description": "Result for Concisability dimension: 'true' if the description is succinct, non-redundant, and includes essential information; 'false' otherwise."
+    },
+    "concisability_explanation": {
+      "type": "string",
+      "description": "Short explanation supporting the concisability_result, noting what is concise or what is verbose/redundant and suggestions to improve brevity."
+    },
+    "coverage_result": {
+      "type": "boolean",
+      "description": "Result for Coverage dimension: 'true' if the description covers competency and key method comprehensively; 'false' if it omits important content or leaves gaps."
+    },
+    "coverage_explanation": {
+      "type": "string",
+      "description": "Short explanation supporting the coverage_result, identifying missing elements or confirming coverage and giving targeted suggestions to fill gaps."
+    },
+    "attractive_result": {
+      "type": "boolean",
+      "description": "Result for Attractive dimension: 'true' if the description uses an engaging, motivating tone that inspires interest; 'false' if it is dull or unengaging."
+    },
+    "attractive_explanation": {
+      "type": "string",
+      "description": "Short explanation supporting the attractive_result, describing tone issues or strengths and providing concise recommendations to make the description more compelling."
+    },
+    "format_criteria_result": {
+      "type": "boolean",
+      "description": "Result for Format Criteria dimension: 'true' if the content is structured as a summarized paragraph implicitly combining introduction, competency, and key method; 'false' otherwise."
+    },
+    "format_criteria_explanation": {
+      "type": "string",
+      "description": "Short explanation supporting the format_criteria_result, indicating whether the paragraph format is met and what to change to align with the required format."
+    }
+  },
+  "required": [
+    "concisability_result",
+    "concisability_explanation",
+    "coverage_result",
+    "coverage_explanation",
+    "attractive_result",
+    "attractive_explanation",
+    "format_criteria_result",
+    "format_criteria_explanation"
+  ],
+  "additionalProperties": False,
+  "strict": False
+}
+EVAL_DESCRIPTION_WEIGHT = {
+    "concisability_result":1,
+    "coverage_result":1,
+    "attractive_result":1,
+    "format_criteria_result":1
+}
