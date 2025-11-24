@@ -1,4 +1,3 @@
-from re import template
 from langchain.tools import tool
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
@@ -16,7 +15,9 @@ sys.path.append(str(project_root))
 
 from config import (
     CLAIMS_EXTRACTION_PROMPT,
+    CLAIMS_EXTRACTION_OUTPUT,
     CLAIMS_VERIFICATION_PROMPT,
+    CLAIMS_VERIFICATION_OUTPUT,
     EVAL_COMPETENCY_OUTPUT,
     EVAL_COMPETENCY_PROMPT,
     EVAL_COMPETENCY_WEIGHT,
@@ -42,7 +43,6 @@ from config import (
     EVAL_REFLECTION_ASSE_OUTPUT,
     EVAL_REFLECTION_ASSE_WEIGHT
 )
-from utility.output_schema import ExtractFactualClaimsOutput,ClaimVerification
 from utility.web_search_tool import brave_search,jina_reader_fetch
 
 llm = ChatOpenAI(
@@ -51,23 +51,23 @@ llm = ChatOpenAI(
     temperature=0,
 )
 
-async def methodcomp_claims_extraction(method_component: str, reference:str) -> ExtractFactualClaimsOutput:
+async def methodcomp_claims_extraction(method_component: str, reference:str) -> dict:
     ## Extract Claim
     prompt = PromptTemplate.from_template(
         template=CLAIMS_EXTRACTION_PROMPT,
         template_format="jinja2"
     )
     complie_prompt = prompt.format(method_component=method_component,reference=reference)
-    structure_llm = llm.with_structured_output(ExtractFactualClaimsOutput)
+    structure_llm = llm.with_structured_output(CLAIMS_EXTRACTION_OUTPUT, method='json_schema')
     extracted_result = await structure_llm.ainvoke(complie_prompt)
     return extracted_result
 
-async def methodcomp_claims_verification(extracted_result:ExtractFactualClaimsOutput) -> ExtractFactualClaimsOutput:
+async def methodcomp_claims_verification(extracted_result:dict) -> dict:
     ## Grouped source
     grouped = {}
-    for claim in extracted_result.claims:
-        claim.support = 'no'
-        src = claim.source
+    for claim in extracted_result['claims']:
+        claim['support'] = 'no'
+        src = claim['source']
         if src not in grouped:
             grouped[src] = []
         grouped[src].append(claim)
@@ -77,7 +77,7 @@ async def methodcomp_claims_verification(extracted_result:ExtractFactualClaimsOu
         template=CLAIMS_VERIFICATION_PROMPT,
         template_format="jinja2"
     )
-    structure_verify_llm = llm.with_structured_output(ClaimVerification)
+    structure_verify_llm = llm.with_structured_output(CLAIMS_VERIFICATION_OUTPUT, method='json_schema')
 
     for source in grouped.keys():
         if source == '':
@@ -86,17 +86,17 @@ async def methodcomp_claims_verification(extracted_result:ExtractFactualClaimsOu
         ref_content = jina_reader_fetch(web_url[0]['link'])
         formatted_verify_prompt = verify_prompt.format(ref_content=ref_content,claims=grouped[source])
         verifed_result = await structure_verify_llm.ainvoke(formatted_verify_prompt)
-        for verified_claim in verifed_result.verifications:
-            item = next((x for x in extracted_result.claims if x.id == verified_claim.id), None)
+        for verified_claim in verifed_result['verifications']:
+            item = next((x for x in extracted_result['claims'] if x['id'] == verified_claim['id']), None)
             if item:
-                item.support = verified_claim.result
+                item['support'] = verified_claim['result']
 
     return extracted_result
 
-async def calculate_factualness_score(verified_claims:ExtractFactualClaimsOutput) -> dict:
-    count_with_source = sum(1 for item in verified_claims.claims if item.source != '')
-    count_support = sum(1 for item in verified_claims.claims if item.support == "yes")
-    count_claims = len(verified_claims.claims)
+async def calculate_factualness_score(verified_claims:dict) -> dict:
+    count_with_source = sum(1 for item in verified_claims['claims'] if item['source'] != '')
+    count_support = sum(1 for item in verified_claims['claims'] if item['source'] == "yes")
+    count_claims = len(verified_claims['claims'])
     try:
         groundness_score = count_with_source/count_claims
     except:
@@ -107,7 +107,7 @@ async def calculate_factualness_score(verified_claims:ExtractFactualClaimsOutput
         faithfulness_score = 0.0
     
     result = {
-        "claims": [c for c in verified_claims.claims],
+        "claims": [c for c in verified_claims['claims']],
         "groundness_score": groundness_score,
         "faithfulness_score": faithfulness_score,
     }

@@ -189,6 +189,45 @@ The micro-credential requires approximately 40 hours of total effort. [7]"
 {{reference}}
 </reference>
 """
+CLAIMS_EXTRACTION_OUTPUT = {
+  "title": "extract_factual_claims",
+  "description": "Extract all distinct verifiable factual claims from a provided method component and map any directly following citation markers to their corresponding URLs. Returns an array of claim objects with the exact claim text and the supporting URL (or empty string if none).",
+  "type": "object",
+  "properties": {
+    "claims": {
+      "type": "array",
+      "description": "List of extracted factual claims from the method component. Each array item is an object with the claim text and its source URL (empty string if no directly following citation).",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "description": "number run from 1 to total number of claims extracted"
+          },
+          "claim": {
+            "type": "string",
+            "description": "The exact statement representing a factual claim, preserved from the method component and properly JSON-escaped."
+          },
+          "source": {
+            "type": "string",
+            "description": "The URL directly following the claim in the method component that supports the claim, or an empty string if no direct citation follows the claim."
+          }
+        },
+        "required": [
+          "id",
+          "claim",
+          "source"
+        ],
+        "additionalProperties": False
+      }
+    }
+  },
+  "required": [
+    "claims"
+  ],
+  "additionalProperties": False,
+  "strict": False
+}
 CLAIMS_VERIFICATION_PROMPT = """
 ## Task Description
 Your task is to verify whether multiple claims are supported by the provided reference content.
@@ -242,9 +281,377 @@ Please provide your verification results in the specified JSON format.
 {{claims}}
 </claims>
 """
+CLAIMS_VERIFICATION_OUTPUT = {
+  "title": "claim_verification",
+  "description": "Verify whether multiple claims are supported by the provided reference content. For each claim, return an object with the claim's id and a result: 'yes', 'no', or 'unknown'.",
+  "type": "object",
+  "properties": {
+    "verifications": {
+      "type": "array",
+      "description": "An array of verification results, one per claim.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The identifier of the claim (must match the input claim id)."
+          },
+          "result": {
+            "type": "string",
+            "description": "Verification outcome for the claim: 'yes' if supported, 'no' if not supported, 'unknown' if verification is impossible or reference unavailable.",
+            "enum": [
+              "yes",
+              "no",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "result"
+        ],
+        "additionalProperties": False
+      }
+    }
+  },
+  "required": [
+    "verifications"
+  ],
+  "additionalProperties": False,
+  "strict": False
+}
 
-EVAL_LEARNER_BG_PROMPT = "agent-spark-eval-learner_background"
-EVAL_KNOWLEDGE_DOMAIN_PROMPT = "agent-spark-eval-knowledge_domain"
+LEARNER_BG_SYSTEM_PROMPT ="""
+You are an experienced education professor specializing in evaluating the quality of learner background profiles.
+Your role is to analyze the provided learner background content, identify strengths and weaknesses, and give clear, actionable feedback on areas that need improvement.
+At the beginning of every task, you must always use the search tool to gather all necessary context before performing your assessment.
+"""
+EVAL_LEARNER_BG_PROMPT = """
+<instruction>
+**Your Goal**: Evaluate the <learner background> describing the learner profile and their needs/pain points. You must assess quality and provide targeted refinement suggestions using the following dimensions.
+
+---
+## DIMENSIONS
+1. **Profile Concisability**
+evaluate the clarity and brevity of the learner profile, ensuring it succinctly describes who the learners are and the occupations they hold.
+   - Output **true** if concise, specific, and easy to understand the learner profile.  
+   - Output **false** if vague, overly long, missing key details, or repetitive.
+2. **Need Concisability**  
+evaluate the information that describe concisely about what do they want, the situation that they want to solve or their responsibility
+   - Output **true** if the problem or needs of the learner is specific and concise.  
+   - Output **false** if vague, unfocused, too long, or missing clear problem context.
+---
+
+## YOUR TASKS
+### **1. Analyze the User Input**
+For each dimension:
+- Evaluate whether it meets the dimension's requirements.  
+- Return only **true/false** ('<dimension's result>').  
+- Provide a short explanation of your reasoning ('<dimension's explanation>').
+---
+
+### **2. Summarize feedback**
+- Create a summarized feedback that cover all <dimension's explanation>.
+- Return a short summary paragraph ('<feedback>')
+---
+
+### **3. Refinement Logic**
+For each dimension:
+**If the score is `false`, you MUST return 2-3 <refinement_topic> object ** consisting of:
+  - <type>: ["profile", "needs"] depend on the area that need to refine.
+  - <topic_name>: A short label describing topic about the suggestion version
+  - <topic_suggestion>: A suggestion that will be used to revise the current learner background follow the <topic_name> and <feedback>
+**If the score is `true`,`<type>` ,`<topic_name>` and `<topic_suggestion>` must be empty strings.**
+---
+
+## OUTPUT FORMAT
+Respond strictly in this JSON structure:
+{
+    "profile_concisability_result": <dimension's result>,
+    "profile_concisability_explanation": <dimension's explanation>,
+    "need_concisability_result": <dimension's result>,
+    "need_concisability_explanation": <dimension's explanation>,
+    "feedback": <feedback>,
+    "refinement_topic": [
+        {
+            "type": <type>,
+            "topic_name": <topic_name>,
+            "topic_suggestion": <topic_suggestion>,
+        },
+        {
+            "type": <type>,
+            "topic_name": <topic_name>,
+            "topic_suggestion": <topic_suggestion>,
+        }
+    ]
+}
+---
+
+## EXAMPLE
+<learner background>
+"officer"
+</learner background>
+
+<output>
+{
+"profile_concisability_result": false,
+"profile_concisability_explanation": "The profile contains only the single word 'officer' which is too brief and ambiguous — it lacks sector (police, military, security, compliance, etc.), rank, responsibilities, experience level, and context.",
+"need_concisability_result": false,
+"need_concisability_explanation": "No needs or pain points are provided — the submission doesn't state what the learner wants to achieve, what problems they face, or which responsibilities they need help with.",
+"feedback": "The learner profile is overly vague and lacks essential details about the type of officer and their specific responsibilities. Additionally, there are no stated needs or pain points, making it difficult to understand what the learner requires assistance with.",
+  "refinement_topic": [
+    {
+      "type": "profile",
+      "topic_name": "Security officer",
+      "topic_suggestion": "Expand the profile by specifying the security environment (such as campus, corporate office, hospital, or event venue) and add relevant responsibilities like patrol duties, monitoring, access control, or incident reporting."
+    },
+    {
+      "type": "profile",
+      "topic_name": "Compliance officer",
+      "topic_suggestion": "Refine the profile by identifying the compliance domain (e.g., AML, regulatory monitoring, internal audit) and describing responsibilities such as reviewing reports, monitoring risks, or ensuring regulatory adherence."
+    },
+    {
+      "type": "needs",
+      "topic_name": "Procedures documentation",
+      "topic_suggestion": "Enhance the needs description by adding the types of procedures involved, the regulatory context, and the specific challenges the officer faces in creating or maintaining documentation."
+    },
+    {
+      "type": "needs",
+      "topic_name": "Operational training goal",
+      "topic_suggestion": "Improve the needs statement by specifying the operational skills to be developed, such as de-escalation, communication, safety protocol execution, or incident report writing."
+    }
+  ]
+</output>
+
+### Additional Requirements
+- All suggestions must directly solve the issue described in your analysis.  
+- Suggested versions must be **concise**, **specific**, and **aligned with the user’s intent**.  
+</instruction>
+
+**Please analyze the provided <learner background> content below following the <instruction> described above**
+
+<learner background>
+{{learner_background}}
+</learner background>
+"""
+EVAL_LEARNER_BG_OUTPUT = {
+  "title": "evaluate_learner_background",
+  "description": "Schema for the evaluation of a learner background describing profile and needs. Contains dimension results (true/false), short explanations, a combined feedback paragraph, and a list of 2-3 refinement topic suggestions.",
+  "type": "object",
+  "properties": {
+    "profile_concisability_result": {
+      "type": "boolean",
+      "description": "Result for Profile Concisability dimension: true if the learner profile is concise, specific, and easy to understand; false otherwise."
+    },
+    "profile_concisability_explanation": {
+      "type": "string",
+      "description": "Short explanation supporting the profile_concisability_result. Should state why the profile is concise or what is missing/unclear."
+    },
+    "need_concisability_result": {
+      "type": "boolean",
+      "description": "Result for Need Concisability dimension: true if the learner's needs/problems are specific and concise; false otherwise."
+    },
+    "need_concisability_explanation": {
+      "type": "string",
+      "description": "Short explanation supporting the need_concisability_result. Should state why the needs are clear or what is vague/missing."
+    },
+    "feedback": {
+      "type": "string",
+      "description": "A concise summary paragraph that synthesizes the explanations for both dimensions and gives overall feedback."
+    },
+    "refinement_topic": {
+      "type": "array",
+      "description": "A list of 2-3 suggested refinement topics. If a dimension result is true, corresponding suggestion fields must be empty strings. If false, provide 2-3 concise, specific suggestion objects addressing the deficiency.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Area to refine: one of 'profile' or 'needs' (or empty string when not applicable).",
+            "enum": [
+              "profile",
+              " needs",
+              "null"
+            ]
+          },
+          "topic_name": {
+            "type": "string",
+            "description": "Short label describing the refinement topic (or empty string when not applicable)."
+          },
+          "topic_suggestion": {
+            "type": "string",
+            "description": "Concise, actionable suggestion to revise the learner background according to the topic_name and feedback (or empty string when not applicable)."
+          }
+        },
+        "required": [
+          "type",
+          "topic_name",
+          "topic_suggestion"
+        ],
+        "additionalProperties": False
+      },
+      "minItems": 2,
+      "maxItems": 4
+    }
+  },
+  "required": [
+    "profile_concisability_result",
+    "profile_concisability_explanation",
+    "need_concisability_result",
+    "need_concisability_explanation",
+    "feedback",
+    "refinement_topic"
+  ],
+  "additionalProperties": False,
+  "strict": False
+}
+
+KNOWLEDGE_DOMAIN_SYSTEM_PROMPT = """
+You are an experienced education professor specializing in evaluating the quality of interest knowledge domain or knowledge background of student.
+Your role is to analyze the provided knwoledge domain content, identify strengths and weaknesses, and give clear, actionable feedback on areas that need improvement.
+At the beginning of every task, you must always use the search tool to gather all necessary context before performing your assessment.
+"""
+EVAL_KNOWLEDGE_DOMAIN_PROMPT = """
+<instruction>
+**Your Goal**: Evaluate the <teaching domain> describing the knowledge domain that the user want to teach. You must assess quality and provide targeted refinement suggestions using the following dimensions.
+
+---
+## DIMENSIONS
+1. **Comprehensive**
+evaluate whether the provided information thoroughly describes the domain of instruction, encompassing the intended knowledge area, its application scenarios, and the specific tools or frameworks to be taught.
+   - Output **true** if the information is detailed, clearly defines the knowledge area, includes relevant application scenarios, and specifies the tools or frameworks to be taught.
+   - Output **false** if the information is unclear, lacks detail, omits key elements, or is unnecessarily lengthy or repetitive.
+---
+
+## YOUR TASKS
+### **1. Analyze the User Input**
+For each dimension:
+- Evaluate whether it meets the dimension's requirements.  
+- Return only **true/false** ('<dimension's result>').  
+- Provide a short explanation of your reasoning ('<dimension's explanation>').
+---
+
+### **2. Summarize feedback**
+- Create a summarized feedback that cover all <dimension's explanation>.
+- Return a short summary paragraph ('<feedback>')
+---
+
+### **3. Refinement Logic**
+For each dimension:
+**If the score is `false`, you MUST return 2-3 <refinement_topic> object ** consisting of:
+  - <topic_name>: A short label describing topic about the suggestion version
+  - <topic_suggestion>: A suggestion that will be used to revise the current learner background follow the <topic_name> and <feedback>
+**If the score is `true`, both `<topic_name>` and `<topic_suggestion>` must be empty strings.**
+---
+
+## OUTPUT FORMAT
+Respond strictly in this JSON structure:
+{
+    "comprehensive_result": <dimension's result>,
+    "comprehensive_explanation": <dimension's explanation>,
+    "feedback": <feedback>
+    "refinement_topic":[
+        {
+            "topic_name": <topic_name>,
+            "topic_suggestion": <topic_suggestion>
+        },
+        {
+            "topic_name": <topic_name>,
+            "topic_suggestion": <topic_suggestion>
+        },
+        ...
+    ],
+}
+---
+
+## EXAMPLE
+<teaching domain>
+"Power Automate"
+</teaching domain>
+
+<output>
+{
+  "comprehensive_result": false,
+  "comprehensive_explanation": "The input only names the product ('Power Automate') and does not define the teaching scope, learning objectives, target audience, application scenarios, nor the specific tools and frameworks (cloud flows vs Desktop, connectors, related Power Platform components) that will be taught.",
+  "feedback": "The input only states the product name and lacks details on scope, objectives, audience, scenarios, and specific Power Automate components to be taught.",
+  "refinement_topic": [
+    {
+      "topic_name": "Automation pipeline",
+      "topic_suggestion": "Expand the content by describing the automation focus, such as specifying whether it covers cloud flows, desktop automation, RPA tasks, common business process scenarios, and key Power Automate components relevant to building an automation pipeline."
+    },
+    {
+      "topic_name": "Data analysis",
+      "topic_suggestion": "Enhance the content by detailing how Power Automate is used for data processing, integration with other Power Platform tools, typical data workflows, and scenarios where automation supports analysis, reporting, or real-time data interactions."
+    }
+  ]
+}
+</output>
+---
+
+### Additional Requirements
+- All suggestions must directly solve the issue described in your analysis.  
+- Suggested versions must be **concise**, **specific**, and **aligned with the user’s intent**.  
+</instruction>
+
+**Please analyze the provided <teaching domain> content below following the <instruction> described above**
+
+<teaching domain>
+{{teaching_domain}}
+</teaching domain>
+"""
+EVAL_KNOWLEDGE_DOMAIN_OUTPUT = {
+  "title": "teaching_domain_evaluation",
+  "description": "Evaluate a teaching domain description for completeness (Comprehensive dimension). Return a boolean result, a brief explanation, a consolidated feedback paragraph, and 2-3 refinement topic suggestions when the dimension is not met.",
+  "type": "object",
+  "properties": {
+    "comprehensive_result": {
+      "type": "boolean",
+      "description": "Result of the 'Comprehensive' dimension evaluation: true if the teaching domain description thoroughly defines the knowledge area, application scenarios, and specific tools/frameworks to be taught; false otherwise."
+    },
+    "comprehensive_explanation": {
+      "type": "string",
+      "description": "A short explanation (one or two sentences) justifying the comprehensive_result, describing which elements are present or missing."
+    },
+    "feedback": {
+      "type": "string",
+      "description": "A concise summary paragraph that synthesizes the comprehensive_explanation(s) into unified feedback for improving the teaching domain description."
+    },
+    "refinement_topic": {
+      "type": "array",
+      "description": "If comprehensive_result is false, return 2-3 suggestion objects. If true, return one or more objects with empty strings for both fields.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "topic_name": {
+            "type": "string",
+            "description": "Short label describing the suggestion topic (empty string if no suggestion required)."
+          },
+          "topic_suggestion": {
+            "type": "string",
+            "description": "Concise, specific suggestion to revise the teaching domain to address the identified deficiency (empty string if not required)."
+          }
+        },
+        "required": [
+          "topic_name",
+          "topic_suggestion"
+        ],
+        "additionalProperties": False
+      },
+      "minItems": 2
+    }
+  },
+  "required": [
+    "comprehensive_result",
+    "comprehensive_explanation",
+    "feedback",
+    "refinement_topic"
+  ],
+  "additionalProperties": False,
+  "strict": False
+}
 
 EVAL_WHOISTHISFOR_PROMPT = """
 <instruction>

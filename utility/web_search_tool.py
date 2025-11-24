@@ -1,5 +1,7 @@
 import requests,os
 from dotenv import load_dotenv
+from langchain.tools import tool
+from tavily import TavilyClient
 
 load_dotenv()
 
@@ -71,3 +73,21 @@ def jina_reader_fetch(url: str) -> str:
             return response.text
     except requests.RequestException as e:
         return f"Error fetching content"
+    
+@tool
+def tavily_search(query: str) -> str:
+    """
+    Search the web for information.
+    args:
+    - query (str) : search query
+
+    return:
+    - response (dict) : object that included with answer, list of url results, and search score
+    """
+    client = TavilyClient(api_key=os.getenv("TAVILY_SEARCH_API"))
+    response = client.search(
+        query=query,
+        include_answer="basic",
+        max_results=3
+    )
+    return response
